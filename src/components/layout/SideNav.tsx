@@ -13,7 +13,7 @@ const navItems = [
 
 export default function SideNav() {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -27,8 +27,20 @@ export default function SideNav() {
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-300 flex flex-col">
       {/* Logo */}
-      <div className="p-6">
-        <span className="text-xl font-bold">Seenazero</span>
+      <div className="p-6 flex items-center gap-2">
+        <img 
+          src="/alpha-logo.svg" 
+          alt="Seenazero Logo" 
+          className="h-8 w-auto"
+        />
+        <Link 
+          href="/profile" 
+          className="text-sm text-gray-600 hover:text-gray-900 transition-colors max-w-[120px] truncate"
+          title={user?.user_metadata?.full_name || user?.email || 'User'}
+        >
+          <span className="text-gray-400 text-lg">/</span>{' '}
+          {user?.user_metadata?.full_name || user?.email || 'User'}
+        </Link>
       </div>
 
       {/* Navigation Items */}

@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -40,4 +64,41 @@ body {
 
 .animate-spin-slow {
   animation: rotate 4s linear infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  border-radius: 1rem;
+}
+
+/* Global input field styles */
+input, textarea, select {
+  @apply w-full px-4 py-3 rounded-full;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px 0 rgba(31, 38, 135, 0.05);
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+input::placeholder, textarea::placeholder, select::placeholder {
+  color: #666;
+  font-weight: 400;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 80, 33, 0.5);
+  box-shadow: 0 4px 12px 0 rgba(255, 80, 33, 0.1);
+}
+
+/* Hide default labels when using placeholder-based labels */
+label.sr-only {
+  display: none;
 }

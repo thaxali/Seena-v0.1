@@ -49,7 +49,18 @@ export default function StudyStats() {
   }, []);
 
   if (loading) {
-    return <div className="flex gap-6 mb-8">Loading stats...</div>;
+    return (
+      <div className="flex gap-6 mb-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex-1 bg-white border border-gray-300 rounded-lg p-6">
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (

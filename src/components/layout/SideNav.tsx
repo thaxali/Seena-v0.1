@@ -2,7 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/contexts/ProfileContext';
 import Link from 'next/link';
+import OnboardingTasks from '@/components/onboarding/OnboardingTasks';
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useOnboardingTasks } from '@/hooks/useOnboardingTasks';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', disabled: false },
@@ -14,6 +19,9 @@ const navItems = [
 export default function SideNav() {
   const router = useRouter();
   const { signOut, user } = useAuth();
+  const { isProfileComplete } = useProfile();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const { tasks } = useOnboardingTasks();
 
   const handleSignOut = async () => {
     try {
@@ -24,6 +32,12 @@ export default function SideNav() {
     }
   };
 
+  // Calculate progress percentage based on completed tasks + 1 (account creation)
+  const completedOnboardingTasks = tasks.filter((task: { isComplete: boolean }) => task.isComplete).length;
+  const completedTasks = completedOnboardingTasks + 1; // Add 1 for account creation
+  const totalTasks = tasks.length + 1; // Add 1 for account creation
+  const progressPercentage = Math.round((completedTasks / totalTasks) * 100) + '%';
+
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-300 flex flex-col">
       {/* Logo */}
@@ -33,13 +47,17 @@ export default function SideNav() {
           alt="Seenazero Logo" 
           className="h-8 w-auto"
         />
+        <span className="text-gray-400 text-lg">/</span>
         <Link 
           href="/profile" 
-          className="text-sm text-gray-600 hover:text-gray-900 transition-colors max-w-[120px] truncate"
-          title={user?.user_metadata?.full_name || user?.email || 'User'}
+          className="flex items-center gap-2 group hover:text-orange-500 transition-colors"
         >
-          <span className="text-gray-400 text-lg">/</span>{' '}
-          {user?.user_metadata?.full_name || user?.email || 'User'}
+          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white font-medium">
+            {user?.email?.[0].toUpperCase() || 'U'}
+          </div>
+          <span className="text-sm font-medium text-gray-700 group-hover:text-orange-500">
+            {user?.user_metadata?.display_name || user?.email || 'User'}
+          </span>
         </Link>
       </div>
 
@@ -70,20 +88,30 @@ export default function SideNav() {
         </ul>
       </nav>
 
-      {/* Progress Button */}
+      {/* Progress Button and Onboarding Tasks */}
       <div className="p-4">
-        <div className="relative">
+        {showOnboarding ? (
+          <div className="relative">
+            <button
+              onClick={() => setShowOnboarding(false)}
+              className="absolute top-0 right-0 p-2 text-gray-400 hover:text-orange-500 transition-colors"
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
+            <OnboardingTasks />
+          </div>
+        ) : (
           <button
             className="w-full py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
             style={{ 
               '--offset': '1px',
               boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
             } as React.CSSProperties}
-            onClick={() => {/* TODO: Implement onboarding flow */}}
+            onClick={() => setShowOnboarding(true)}
           >
             <span className="relative z-20">
               <span className="text-black">Getting started </span>
-              <span className="text-gray-500">20%</span>
+              <span className="text-gray-500">{progressPercentage}</span>
             </span>
             <div 
               className="absolute top-1/2 left-1/2 animate-spin-slow"
@@ -100,7 +128,7 @@ export default function SideNav() {
               }}
             />
           </button>
-        </div>
+        )}
       </div>
 
       {/* Sign Out Button */}

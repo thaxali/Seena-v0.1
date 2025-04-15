@@ -9,6 +9,7 @@ interface StudyTableProps {
   onSearchChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  onCreateStudy: () => void;
 }
 
 export default function StudyTable({
@@ -17,6 +18,7 @@ export default function StudyTable({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  onCreateStudy,
 }: StudyTableProps) {
   const statusOptions = [
     { value: 'all', label: 'All Statuses' },
@@ -85,8 +87,14 @@ export default function StudyTable({
           <tbody className="bg-white divide-y divide-gray-300">
             {studies.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
-                  No studies found
+                <td colSpan={3} className="px-6 py-8 text-center">
+                  <p className="text-gray-500 mb-2">You do not have any studies yet.</p>
+                  <button
+                    onClick={onCreateStudy}
+                    className="text-orange-500 hover:text-orange-600 font-medium"
+                  >
+                    Create a study
+                  </button>
                 </td>
               </tr>
             ) : (

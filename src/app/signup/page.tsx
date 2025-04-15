@@ -37,12 +37,34 @@ export default function SignUpPage() {
       
       const supabase = createClient(supabaseUrl, supabaseKey);
       
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (signUpError) throw signUpError;
+
+      // Initialize onboarding tasks for the new user if we have a user
+      if (authData?.user?.id) {
+        const tasks = [
+          { task_id: 'complete_profile', is_complete: false },
+          { task_id: 'create_first_study', is_complete: false },
+          { task_id: 'add_interview_data', is_complete: false }
+        ];
+
+        const { error: tasksError } = await supabase
+          .from('onboarding_tasks')
+          .insert(tasks.map(task => ({
+            user_id: authData.user.id,
+            ...task
+          })));
+
+        if (tasksError) {
+          console.error('Error initializing onboarding tasks:', tasksError);
+          // Don't throw here, as the user is already created
+        }
+      }
 
       // Redirect to dashboard on success
       router.push('/dashboard');

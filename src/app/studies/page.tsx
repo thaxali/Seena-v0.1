@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
 import StudyTable from '@/components/studies/StudyTable';
 import PrimaryButton from '@/components/ui/PrimaryButton';
+import Dialog from '@/components/ui/Dialog';
+import { useOnboardingTasks } from '@/hooks/useOnboardingTasks';
 
 export default function StudiesPage() {
   const [studies, setStudies] = useState<Study[]>([]);
@@ -13,13 +15,19 @@ export default function StudiesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { markTaskComplete } = useOnboardingTasks();
 
   useEffect(() => {
     async function fetchStudies() {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
         const { data, error } = await supabase
           .from('studies')
           .select('*')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -34,6 +42,80 @@ export default function StudiesPage() {
 
     fetchStudies();
   }, []);
+
+  const handleCreateStudy = async (studyName?: string) => {
+    console.log('handleCreateStudy called with:', studyName);
+    
+    if (!studyName?.trim()) {
+      console.log('Study name is empty');
+      setError('Study name cannot be empty');
+      return;
+    }
+    
+    try {
+      console.log('Getting current user');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Check if this is the user's first study
+      const { data: existingStudies, error: countError } = await supabase
+        .from('studies')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (countError) {
+        console.error('Error checking existing studies:', countError);
+        throw countError;
+      }
+
+      const isFirstStudy = !existingStudies || existingStudies.length === 0;
+
+      console.log('Creating study with name:', studyName);
+      const { data, error } = await supabase
+        .from('studies')
+        .insert([
+          {
+            title: studyName.trim(),
+            description: '',
+            status: 'draft',
+            user_id: user.id,
+            created_by: user.id,
+            objective: '',
+            study_type: 'interview',
+            target_audience: '',
+            research_questions: '',
+            interview_structure: '',
+            interview_format: '',
+            thread_id: null,
+            locked_fields: [],
+            inception_complete: false
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating study:', error);
+        throw error;
+      }
+      
+      console.log('Study created successfully:', data);
+      // Add the new study to the list
+      setStudies(prevStudies => [data, ...prevStudies]);
+      
+      // Only mark the task as complete if this is the first study
+      if (isFirstStudy) {
+        await markTaskComplete('create_first_study');
+      }
+      
+      // Close the dialog
+      setIsCreateDialogOpen(false);
+    } catch (err) {
+      console.error('Error creating study:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create study');
+    }
+  };
 
   // Filter studies based on search term and status filter
   const filteredStudies = studies.filter(study => {
@@ -130,7 +212,7 @@ export default function StudiesPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Studies</h1>
           <PrimaryButton 
-            onClick={() => {/* TODO: Implement create study dialog */}}
+            onClick={() => setIsCreateDialogOpen(true)}
             icon={
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -147,6 +229,19 @@ export default function StudiesPage() {
           onSearchChange={setSearchTerm}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          onCreateStudy={() => setIsCreateDialogOpen(true)}
+        />
+
+        <Dialog
+          isOpen={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onConfirm={handleCreateStudy}
+          title="New Study"
+          description="Give your new study a unique name"
+          inputPlaceholder="Study Name"
+          confirmButtonText="Create"
+          cancelButtonText="Cancel"
+          isRequired={true}
         />
       </div>
     </MainLayout>

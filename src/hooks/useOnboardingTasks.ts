@@ -76,7 +76,9 @@ export function useOnboardingTasks() {
   };
 
   useEffect(() => {
-    fetchTasks();
+    if (user) {
+      fetchTasks();
+    }
   }, [user]);
 
   const markTaskComplete = async (taskId: string) => {

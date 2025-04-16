@@ -2,6 +2,7 @@
 
 import { Study } from '@/types/study';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 interface StudyTableProps {
   studies: Study[];
@@ -101,7 +102,12 @@ export default function StudyTable({
               studies.map((study) => (
                 <tr key={study.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{study.title}</div>
+                    <Link 
+                      href={`/studies/${study.id}`}
+                      className="text-sm font-medium text-gray-900 hover:text-orange-500 transition-colors"
+                    >
+                      {study.title}
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(study.status)}`}>

@@ -82,7 +82,7 @@ export default function StudiesPage() {
             user_id: user.id,
             created_by: user.id,
             objective: '',
-            study_type: 'interview',
+            study_type: '',
             target_audience: '',
             research_questions: '',
             interview_structure: '',

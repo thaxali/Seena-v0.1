@@ -56,7 +56,7 @@ export default function SignUpPage() {
         const { error: tasksError } = await supabase
           .from('onboarding_tasks')
           .insert(tasks.map(task => ({
-            user_id: authData.user.id,
+            user_id: authData.user?.id,
             ...task
           })));
 

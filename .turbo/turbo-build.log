@@ -1,0 +1,36 @@
+
+
+> web@0.1.0 build
+> next build
+
+[1G[0K  [1m[38;2;173;127;168m ▲ Next.js 14.1.3[39m[22m
+   - Environments: .env.local
+
+ [37m[1m [22m[39m Creating an optimized production build ...
+ [32m[1m✓[22m[39m Compiled successfully
+[?25l [37m[1m [22m[39m Linting and checking validity of types  [36m.[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m..[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m...[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m.[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m..[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m...[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m.[39m[2K[1G[?25h [37m[1m [22m[39m Linting and checking validity of types     [32m[1m✓[22m[39m Linting and checking validity of types 
+[?25l [37m[1m [22m[39m Collecting page data  [36m.[39m[2K[1G[?25h [37m[1m [22m[39m Collecting page data     [32m[1m✓[22m[39m Collecting page data 
+[?25l [37m[1m [22m[39m Generating static pages (0/10)  [36m[    ][39m[2K[1G[?25h [32m[1m✓[22m[39m Generating static pages (10/10) 
+[?25l [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[?25l [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G[?25h [37m[1m [22m[39m Collecting build traces     [32m[1m✓[22m[39m Collecting build traces 
+[2K[1G[?25h [37m[1m [22m[39m Finalizing page optimization     [32m[1m✓[22m[39m Finalizing page optimization 
+
+[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+┌ ○ /                                    428 B          [37m[1m84.8 kB[22m[39m
+├ ○ /_not-found                          885 B          [37m[1m85.3 kB[22m[39m
+├ ○ /dashboard                           1.25 kB         [37m[1m135 kB[22m[39m
+├ ○ /login                               1.75 kB         [37m[1m133 kB[22m[39m
+├ ○ /profile                             4.75 kB         [37m[1m139 kB[22m[39m
+├ ○ /signup                              2.01 kB         [37m[1m133 kB[22m[39m
+├ ○ /studies                             8.73 kB         [37m[1m143 kB[22m[39m
+├ λ /studies/[id]                        2.63 kB         [37m[1m137 kB[22m[39m
+└ λ /studies/[id]/setup                  2.51 kB         [37m[1m137 kB[22m[39m
++ First Load JS shared by all            [37m[1m84.4 kB[22m[39m
+  ├ chunks/69-bc1cda1f51118c9b.js        29 kB
+  ├ chunks/fd9d1056-de13479e00d918bf.js  53.4 kB
+  └ other shared chunks (total)          1.98 kB
+
+
+○  (Static)   prerendered as static content
+λ  (Dynamic)  server-rendered on demand using Node.js
+
+[?25h[1G[0K⠙[1G[0K

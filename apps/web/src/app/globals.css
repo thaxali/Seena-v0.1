@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Doto';
+  src: url('/fonts/doto/Doto_Rounded-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  background: rgb(var(--background-start-rgb));
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes rotate {
+  from {
+    transform: translate(-50%, -50%) scale(1.4) rotate(0turn);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
+  }
+}
+
+.animate-spin-slow {
+  animation: rotate 4s linear infinite;
+}
+
+.animate-spin-pause {
+  animation: rotate-pause 3s linear infinite;
+}
+
+@keyframes rotate-pause {
+  0%, 33% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  border-radius: 1rem;
+}
+
+/* Global input field styles */
+input, textarea, select {
+  @apply w-full px-4 py-3 rounded-full;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px 0 rgba(31, 38, 135, 0.05);
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+input::placeholder, textarea::placeholder, select::placeholder {
+  color: #666;
+  font-weight: 400;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 80, 33, 0.5);
+  box-shadow: 0 4px 12px 0 rgba(255, 80, 33, 0.1);
+}
+
+/* Hide default labels when using placeholder-based labels */
+label.sr-only {
+  display: none;
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-6;
+  }
+
+  .glass-input {
+    @apply w-full px-4 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all;
+  }
+
+  .glass-button {
+    @apply px-4 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-md hover:bg-white/90 transition-all;
+  }
+
+  .glass-dropdown {
+    @apply bg-white/80 backdrop-blur-sm border border-gray-200 rounded-md shadow-lg overflow-hidden;
+  }
+
+  .glass-dropdown-item {
+    @apply w-full px-4 py-2 text-left text-gray-700 hover:bg-white/90 hover:text-orange-500 transition-colors;
+  }
+
+  .glass-select {
+    @apply w-full flex items-center justify-between px-4 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-md hover:bg-white/90 transition-colors;
+  }
+}
+
+/* Button Styles */
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-[#222222] text-white hover:bg-[#000000] hover:text-[#ff5021] transition-colors duration-200 rounded-lg font-mono;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-white text-black border border-black rounded-md hover:bg-gray-100 transition-colors font-mono;
+}

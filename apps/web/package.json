@@ -1,0 +1,44 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:supabase": "ts-node src/lib/test-supabase.ts",
+    "create-assistant": "node scripts/create-assistant.js"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@radix-ui/react-dialog": "^1.1.7",
+    "@radix-ui/react-scroll-area": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.0",
+    "@supabase/supabase-js": "^2.39.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "feather-icons-react": "^0.8.1",
+    "lucide-react": "^0.488.0",
+    "next": "14.1.3",
+    "openai": "^4.95.0",
+    "react": "^18",
+    "react-confetti": "^6.4.0",
+    "react-dom": "^18",
+    "tailwind-merge": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.18",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.3",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
+  }
+}

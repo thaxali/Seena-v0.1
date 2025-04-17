@@ -156,7 +156,8 @@ export default function StudySetupPage() {
           bio: profile?.bio || ''
         },
         message: inputMessage,
-        missingFields: missingFields
+        missingFields: missingFields,
+        activeSection: activeSection
       };
 
       console.log('Sending message to GPT API:', payload);
@@ -257,28 +258,17 @@ export default function StudySetupPage() {
       // Get missing fields
       const missingFields = getMissingFields(study);
       
-      // Prepare message for GPT
-      const message = isEditing 
-        ? "I want to edit this study. Please help me make changes to any field I want to modify."
-        : `Please help me complete the following fields for my study: ${missingFields.join(', ')}`;
-
-      // Add user message to chat
-      const userMessage: { role: 'user', content: string } = {
-        role: 'user',
-        content: message
-      };
-      setMessages(prev => [...prev, userMessage]);
-
-      // Call GPT API
+      // Call GPT API directly without adding a user message
       const response = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: [userMessage],
+          messages: [],
           study: study,
-          isEditing: isEditing
+          isEditing: isEditing,
+          isInitialSetup: true // Add a flag to indicate this is the initial setup
         }),
       });
 
@@ -507,17 +497,17 @@ export default function StudySetupPage() {
                     </p>
                   </div>
                   
-                  <div className={`p-4 rounded-md ${activeSection === 'study_type' ? 'bg-orange-50 border border-orange-200' : ''}`}>
-                    <h3 className="text-sm font-medium mb-2 text-black">Study Type</h3>
-                    <p className={`${study.study_type ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                      {study.study_type || 'One of [Exploratory, Comparative, Attitudinal, Behavioral]'}
-                    </p>
-                  </div>
-                  
                   <div className={`p-4 rounded-md ${activeSection === 'objective' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Objective</h3>
                     <p className={`${study.objective ? 'text-gray-900' : 'text-gray-400 italic'}`}>
                       {study.objective || 'What you want to learn from this study'}
+                    </p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-md ${activeSection === 'study_type' ? 'bg-orange-50 border border-orange-200' : ''}`}>
+                    <h3 className="text-sm font-medium mb-2 text-black">Study Type</h3>
+                    <p className={`${study.study_type ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                      {study.study_type || 'One of [Exploratory, Comparative, Attitudinal, Behavioral]'}
                     </p>
                   </div>
                   

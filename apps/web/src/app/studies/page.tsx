@@ -72,7 +72,7 @@ export default function StudiesPage() {
             title: studyName,
             description: '',
             objective: '',
-            study_type: 'exploratory',
+            study_type: '',
             target_audience: '',
             research_questions: '',
             interview_structure: '',

@@ -11,75 +11,42 @@ const openai = new OpenAI({
 });
 
 // System prompt for the assistant - keeping it concise since we're using chat completions
-const systemPrompt = `You are a UX research assistant helping to set up a research study. Your goal is to guide users through completing their study brief in a conversational, step-by-step manner.
+const systemPrompt = `You are a UX research assistant helping users set up a research study.
 
-You will be getting the following information:
-- Information about the user: their name, name of their company, their role in the company, and some bio or context about what they do.
-- You will get the name of the study.
-- A list Fields that make up the study brief, which you will guide the user to fill out. some of these fields are empty, some are filled.
-- when you are working on a specific  field, this field will be the only one that is focused on.
+▼ CONTEXT YOU RECEIVE
+• User info (name, company, role, bio)
+• Current study object with five key fields
+• A list of which fields are still empty
 
-IMPORTANT INSTRUCTIONS:
-1. Always start with a warm welcome, and greeting the user by name, and introduce yourself as their research co-pilot.
-2. Look at the list of empty fields and focus on ONE field at a time.
-3. For each field:
-   - Explain what information is needed and why it's important
-   - Ask the user for their input, except for the research questions field, where you will generate initial questions and present them to the user.
-   - Wait for their response before moving to the next field
-4. For research questions:
-   - Based on what you know about the study, generate 5 initial questions
-   - Present these questions to the user
-   - Ask if they'd like to modify, add, or remove any questions
-   - If the user approves the questions (e.g., "Those look good", "Yes", "I like these"), SAVE THEM and mark the study as complete
-   - If the user wants changes, guide them through refining the questions
-5. If the user is editing an existing study (indicated by edit=true in the URL):
-   -  Welcome them back and let them know you're here to help them edit the study.
-   - Help them modify specific fields they want to change
-   - Focus on the changes they request rather than going through all fields
-6. BE PROACTIVE:
-   - After acknowledging the user's input, immediately identify the next empty field
-   - Ask a specific question about that field
-   - Focus the UI on that field
-   - Don't wait for the user to ask what's next
-7. NEVER use generic responses like "I'll help you with that" or "How can I assist you?"
-   - Always provide specific guidance on what to do next
-   - Always include a field_update and focus instruction when the user provides input for a field
-   - Always acknowledge the user's input and immediately move to the next field
-8. If the user responds with an Orphaned demonstrative or an unclear reference, look at the previous message to see if you can find the context you need.
+▼ KEY RULES
+1. Greet the user by name and introduce yourself as their research co‑pilot.  
+2. Identify the first empty field and ask ONE clear question.  
+3. After a first‑draft answer **do NOT auto‑advance**.  
+   – Acknowledge the answer.  
+   – Offer to refine it.  
+   – Tell the user to click the **Next** button when satisfied.  
+   – Front‑end sends \`{ "action":"next" }\` when that button is clicked.  
+4. **Study‑type flow**  
+   – Respond with a \`study_type_options\` object, e.g.  
+     {
+       "type":"study_type_options",
+       "options":[
+         {"value":"Exploratory","description":"Understand a new problem space","recommended":true},
+         {"value":"Comparative","description":"Compare multiple solutions"},
+         {"value":"Attitudinal","description":"Learn opinions & preferences"},
+         {"value":"Behavioral","description":"Observe real behaviours"}
+       ]
+     }  
+   – Wait for \`{ "selectedStudyType":"…" }\` before moving on.  
+5. **Research‑questions flow**  
+   – Generate 5 starter questions.  
+   – On user approval **or** \`{ "action":"complete_setup" }\`, save questions and reply with \`{ "type":"complete","value":true }\`.  
+6. Valid response object types: \`message | field_update | focus | study_type_options | complete\`.
 
+Required field order: description ▸ study_type ▸ objective ▸ target_audience ▸ interview_questions`;
 
-
-Required fields that need to be completed:
-1. Description - A one-line overview of what this study is about
-2. Study Type - One of [Exploratory, Comparative, Attitudinal, Behavioral]
-3. Objective - What you want to learn from this study
-4. Target Audience - Who you want to talk to
-5. Research Questions - The list of questions you want to ask participants
-
-Your responses should be structured as a JSON array of objects with the following types:
-1. "message" - A message to display to the user
-2. "field_update" - An update to a study field
-3. "focus" - Which section to focus on in the UI
-4. "complete" - Indicates the study setup is complete
-- When approved, respond with:
-  - a "field_update" to interview_questions
-  - a "message" confirming the questions have been saved
-  - a "complete" object to indicate the study is complete
-
-  
-
-Example response format for a new study:
-[
-  {
-    "type": "message",
-    "content": "Hello! I'm your research co-pilot, here to help you set up your study. I'll guide you through each step of creating a comprehensive study brief. Let's start with a brief description of what this study is about. Can you tell me in one line what you're trying to learn?"
-  },
-  {
-    "type": "focus",
-    "section": "description"
-  }
-]
-]`;
+const NEXT_ACTION = 'next';
+const COMPLETE_SETUP_ACTION = 'complete_setup';
 
 // Store thread IDs for each study
 const threadMap = new Map<string, string>();
@@ -173,7 +140,7 @@ function extractInterviewQuestions(message: string): string | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   const startTime = Date.now();
   console.log('GPT API route called at:', new Date().toISOString());
   
@@ -190,12 +157,11 @@ export async function POST(request: NextRequest) {
     console.log('OpenAI API key is configured, length:', process.env.OPENAI_API_KEY.length);
     
     // Parse the request body
-    const body = await request.json();
-    console.log('Request body size:', JSON.stringify(body).length, 'bytes');
-    console.log('Request body:', JSON.stringify(body, null, 2));
+    const { messages, study, isEditing = false, isInitialSetup = false, payload, missingFields } = await req.json();
     
-    const { messages, study, isEditing = false, isInitialSetup = false, payload, missingFields } = body;
-    
+    const action = payload?.action ?? null;
+    const selectedStudyType = payload?.selectedStudyType ?? null;
+
     if (!messages || !Array.isArray(messages)) {
       console.error('Invalid messages format:', messages);
       return NextResponse.json(
@@ -250,7 +216,7 @@ export async function POST(request: NextRequest) {
           section = 'description';
           break;
         case 'study_type':
-          message = "Great! Now, let's talk about the type of study you're conducting. There are four main types: Exploratory (to understand a problem space), Comparative (to compare different solutions), Attitudinal (to understand user opinions), or Behavioral (to observe user actions). Which type best fits your goals?";
+          message = "Here are the study types. Pick one or ask me about them.";
           section = 'study_type';
           break;
         case 'objective':
@@ -264,6 +230,31 @@ export async function POST(request: NextRequest) {
         default:
           message = "Hello! I'm your research co-pilot, here to help you set up your study. Let's start with a brief description of what this study is about. Can you tell me in one line what you're trying to learn?";
           section = 'description';
+      }
+
+      // If we're starting with study type, include the options
+      if (firstMissingField === 'study_type') {
+        return NextResponse.json({
+          content: [
+            {
+              type: 'message',
+              content: message
+            },
+            {
+              type: 'study_type_options',
+              options: [
+                {value:'Exploratory',description:'Understand a new problem space',recommended:true},
+                {value:'Comparative',description:'Compare multiple solutions'},
+                {value:'Attitudinal',description:'Opinions & preferences'},
+                {value:'Behavioral',description:'Real‑world behaviours'}
+              ]
+            },
+            {
+              type: 'focus',
+              section: section
+            }
+          ]
+        });
       }
 
       return NextResponse.json({
@@ -280,12 +271,85 @@ export async function POST(request: NextRequest) {
       });
     }
     
+    // Handle Next button
+    if (action === NEXT_ACTION) {
+      const order = ['description','study_type','objective','target_audience','interview_questions'];
+      const next = order.find(f => !isFieldFilled(f, study[f]));
+      if (!next) {
+        return NextResponse.json({ content:[{type:'message',content:'All sections are complete.'}] });
+      }
+      switch (next) {
+        case 'description':
+          return NextResponse.json({ content:[
+            {type:'message',content:"Let's add a one‑line description—what are you trying to learn?"},
+            {type:'focus',section:'description'}
+          ]});
+        case 'study_type':
+          return NextResponse.json({ content:[
+            {type:'message',content:"Here are the study types. Pick one or ask me about them."},
+            {type:'study_type_options',options:[
+              {value:'Exploratory',description:'Understand a new problem space',recommended:true},
+              {value:'Comparative',description:'Compare multiple solutions'},
+              {value:'Attitudinal',description:'Opinions & preferences'},
+              {value:'Behavioral',description:'Real‑world behaviours'}
+            ]},
+            {type:'focus',section:'study_type'}
+          ]});
+        case 'objective':
+          return NextResponse.json({ content:[
+            {type:'message',content:"What specific insight do you want from this study?"},
+            {type:'focus',section:'objective'}
+          ]});
+        case 'target_audience':
+          return NextResponse.json({ content:[
+            {type:'message',content:"Who do you hope to interview?"},
+            {type:'focus',section:'target_audience'}
+          ]});
+        default:
+          // Generate initial research questions based on study details
+          const initialQuestions = [
+            `How do users currently approach ${study.objective || 'this task'}?`,
+            `What are the main challenges users face with ${study.description || 'this process'}?`,
+            `What features or solutions would be most valuable to ${study.target_audience || 'your users'}?`,
+            `How do users currently solve the problem you're addressing?`,
+            `What criteria do users use to evaluate solutions in this space?`
+          ].join('\n');
+
+          return NextResponse.json({ content:[
+            {type:'message',content:`I've generated some initial research questions based on your study details:\n\n${initialQuestions}\n\nWould you like to modify any of these questions or add new ones?`},
+            {type:'field_update',field:'interview_questions',value:initialQuestions},
+            {type:'focus',section:'interview_questions'}
+          ]});
+      }
+    }
+
+    // Handle study-type selection
+    if (selectedStudyType) {
+      return NextResponse.json({ content:[
+        {type:'field_update',field:'study_type',value:selectedStudyType},
+        {type:'message',content:`Great – we'll run a ${selectedStudyType} study. Click **Next** when you're ready to continue or ask me follow‑up questions.`},
+        {type:'focus',section:'study_type'}
+      ]});
+    }
+
+    // Handle Complete setup button
+    if (action === COMPLETE_SETUP_ACTION) {
+      const qs = study.interview_questions ?? '';
+      return NextResponse.json({ content:[
+        {type:'field_update',field:'interview_questions',value:qs},
+        {type:'message',content:'All set! Your study is now active.'},
+        {type:'complete',value:true}
+      ]});
+    }
+    
     // Extract study data and research questions from the last message
     let studyData: any = null;
     let researchQuestion: string | null = null;
     let lastSuggestedQuestions: string[] | null = null;
     let parsedPayload: any = null;
     let extractedMissingFields: string[] = [];
+    let userProvidedAnswer = false;
+    let isApprovingQuestions = false;
 
     // Parse the last message content if it's a JSON string
     const lastMessage = messages[messages.length - 1];
@@ -306,7 +370,53 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         // If parsing fails, the content is not JSON
         console.log('Message content is not JSON:', lastMessage.content);
+        // Check if this is a direct user answer
+        if (lastMessage.role === 'user' && lastMessage.content.trim().length > 0) {
+          userProvidedAnswer = true;
+        }
       }
+    }
+
+    // Check if the user is providing an answer to a question
+    if (lastMessage && lastMessage.role === 'user' && lastMessage.content.trim().length > 0) {
+      // Check if the content is JSON
+      try {
+        const parsedContent = JSON.parse(lastMessage.content);
+        // If it's JSON, extract the actual message
+        if (parsedContent.message) {
+          userProvidedAnswer = true;
+          // Store the actual message content, not the JSON
+          lastMessage.content = parsedContent.message;
+        }
+      } catch (e) {
+        // If it's not JSON, it's a direct message
+        userProvidedAnswer = true;
+      }
+    }
+
+    // If the user provided an answer, we should acknowledge it and ask for confirmation
+    if (userProvidedAnswer && !isApprovingQuestions) {
+      // Get the current active section from the payload
+      const activeSection = parsedPayload?.activeSection || '';
+      
+      // Create a response that acknowledges the user's answer and asks for confirmation
+      return NextResponse.json({
+        content: [
+          {
+            type: 'message',
+            content: "Got it – let me know if you'd like to tweak this. When you're happy, click **Next** to continue."
+          },
+          {
+            type: 'field_update',
+            field: activeSection,
+            value: lastMessage.content
+          },
+          {
+            type: 'focus',
+            section: activeSection
+          }
+        ]
+      });
     }
 
     // Find the last message containing suggested questions
@@ -346,7 +456,7 @@ export async function POST(request: NextRequest) {
       'great', 'approved?', 'lets finish', 'continue', 'proceed', 'move on'
     ];
     const lastMessageContent = messages[messages.length - 1]?.content?.toLowerCase() || '';
-    const isApprovingQuestions = lastMessageContent && (
+    isApprovingQuestions = lastMessageContent && (
       approvalPhrases.some(phrase => lastMessageContent.includes(phrase.toLowerCase())) ||
       (lastMessageContent.includes('like') && lastMessageContent.includes('question'))
     );
@@ -379,40 +489,33 @@ export async function POST(request: NextRequest) {
     // Prepare messages for the chat completion
     const systemMessage: ChatCompletionSystemMessageParam = {
       role: 'system',
-      content: `You are a UX research assistant helping users complete their study brief. Guide them through completing their study brief in a conversational manner.
-
-Key points:
-1. ONLY greet the user in the FIRST message. DO NOT reintroduce yourself or greet the user in subsequent messages.
-2. Focus on one empty field at a time, in this order:
-   - Description (one-line overview)
-   - Objective (what they want to learn)
-   - Study Type (exploratory, comparative, attitudinal, or behavioral)
-   - Target Audience (who they want to talk to)
-   - Research Questions (list of questions to ask participants)
-3. For each field:
-   - Explain what information is needed
-   - Ask for their input
-   - Acknowledge their response
-   - Move on to the next field
-4. For research questions:
-   - Generate 5 initial questions based on the study
-   - Ask for their feedback
-   - Help refine the questions through conversation
-5. Keep responses concise and friendly
-6. Always respond in this JSON format:
-   {
-     "message": "Your response message",
-     "field_updates": {
-       "field_name": "new value"
-     },
-     "focus": "field_name"
-   }`
+      content: systemPrompt
     };
 
     // Add the system message to the messages array
     messages.push(systemMessage);
     
-    const userMessages: ChatCompletionUserMessageParam[] = messages.map(msg => ({
+    // Process messages to ensure we're not sending raw JSON to the model
+    const processedMessages = messages.map(msg => {
+      if (msg.role === 'user') {
+        try {
+          // Try to parse as JSON
+          const parsedContent = JSON.parse(msg.content);
+          // If it has a message property, use that instead
+          if (parsedContent.message) {
+            return {
+              role: 'user',
+              content: parsedContent.message
+            };
+          }
+        } catch (e) {
+          // If it's not JSON, use as is
+        }
+      }
+      return msg;
+    });
+    
+    const userMessages: ChatCompletionUserMessageParam[] = processedMessages.map(msg => ({
       role: 'user',
       content: msg.content
     }));
@@ -506,57 +609,69 @@ Key points:
         // Ensure we're returning a valid array format
         let responseContent = [];
 
-        // Handle message
-        if (parsedContent.message) {
-          responseContent.push({
-            type: 'message',
-            content: parsedContent.message
-          });
-        }
-
-        // Handle field updates
-        if (parsedContent.field_updates) {
-          for (const [field, value] of Object.entries(parsedContent.field_updates)) {
+        // Check if the response is an array
+        if (Array.isArray(parsedContent)) {
+          // If it's already an array, use it directly
+          responseContent = parsedContent;
+        } else {
+          // Handle single object format (legacy format)
+          // Handle message
+          if (parsedContent.message) {
             responseContent.push({
-              type: 'field_update',
-              field,
-              value
+              type: 'message',
+              content: parsedContent.message
             });
           }
-        }
 
-        // Handle focus
-        if (parsedContent.focus) {
-          responseContent.push({
-            type: 'focus',
-            section: parsedContent.focus
-          });
-        }
-
-        // Handle complete
-        if (parsedContent.complete) {
-          responseContent.push({
-            type: 'complete',
-            value: parsedContent.complete
-          });
-
-          // Update study status to active when complete
-          try {
-            const { error: updateError } = await supabase
-              .from('studies')
-              .update({ 
-                status: 'active',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', study.id);
-
-            if (updateError) {
-              console.error('Error updating study status:', updateError);
-            } else {
-              console.log('Study status updated to active');
+          // Handle field updates
+          if (parsedContent.field_updates) {
+            for (const [field, value] of Object.entries(parsedContent.field_updates)) {
+              responseContent.push({
+                type: 'field_update',
+                field,
+                value
+              });
             }
-          } catch (error) {
-            console.error('Error updating study status:', error);
+          }
+
+          // Handle focus
+          if (parsedContent.focus) {
+            responseContent.push({
+              type: 'focus',
+              section: parsedContent.focus
+            });
+          }
+
+          // Handle complete
+          if (parsedContent.complete) {
+            responseContent.push({
+              type: 'complete',
+              value: parsedContent.complete
+            });
+
+            // Update study status to active when complete
+            try {
+              const { error: updateError } = await supabase
+                .from('studies')
+                .update({ 
+                  status: 'active',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', study.id);
+
+              if (updateError) {
+                console.error('Error updating study status:', updateError);
+              } else {
+                console.log('Study status updated to active');
+              }
+            } catch (error) {
+              console.error('Error updating study status:', error);
+            }
+          }
+
+          // Handle study_type_options
+          if (parsedContent.type === 'study_type_options') {
+            responseContent.push(parsedContent);
           }
         }
 

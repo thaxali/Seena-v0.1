@@ -6,7 +6,24 @@ import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
 import { GPTMessage } from '@/types/gpt';
-import { ChevronLeft, Send, ArrowUp, Pencil } from 'lucide-react';
+import { ChevronLeft, Send, ArrowUp, Pencil, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import PrimaryButton from '@/components/ui/PrimaryButton';
+
+interface StudyTypeOption {
+  value: string;
+  label: string;
+  description: string;
+  recommended?: boolean;
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 export default function StudySetupPage() {
   const { id } = useParams();
@@ -14,17 +31,21 @@ export default function StudySetupPage() {
   const [study, setStudy] = useState<Study | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [apiCallInitiated, setApiCallInitiated] = useState(false);
   const [apiCallFailed, setApiCallFailed] = useState(false);
+  const [showNextButton, setShowNextButton] = useState(false);
+  const [studyTypeOptions, setStudyTypeOptions] = useState<StudyTypeOption[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const autoStart = searchParams.get('autoStart') === 'true';
   const isEditing = searchParams.get('edit') === 'true';
+  const [pendingQuestions, setPendingQuestions] = useState<string | null>(null);
+  const [questionsApproved, setQuestionsApproved] = useState(false);
 
   // Function to check if study setup is complete
   const isStudySetupComplete = (study: Study): boolean => {
@@ -83,20 +104,25 @@ export default function StudySetupPage() {
 
   // Auto-start the GPT API call if autoStart is true
   useEffect(() => {
-    console.log('Auto-start effect triggered:', { 
-      autoStart, 
-      studyLoaded: !!study, 
-      loading, 
-      isComplete, 
-      apiCallInitiated,
-      apiCallFailed 
-    });
-    
     if (autoStart && study && !loading && !isComplete && !apiCallInitiated && !apiCallFailed) {
-      console.log('Initiating auto-start GPT API call');
-      setApiCallInitiated(true);
-      setIsTyping(true);
-      handleCompleteSetup();
+      const missingFields = getMissingFields(study);
+      if (missingFields.length > 0) {
+        setApiCallInitiated(true);
+        // If only research questions are missing, set the active section immediately
+        if (missingFields.length === 1 && missingFields[0] === 'Research Questions') {
+          console.log('Only research questions are missing, setting active section');
+          setActiveSection('research_questions');
+          setShowNextButton(true);
+        }
+        handleCompleteSetup();
+      } else {
+        // If no missing fields, just mark as complete
+        setIsComplete(true);
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'All fields are already filled. Your study is ready to go!' 
+        }]);
+      }
     }
   }, [autoStart, study, loading, isComplete, apiCallInitiated, apiCallFailed]);
 
@@ -113,6 +139,346 @@ export default function StudySetupPage() {
     return requiredFields
       .filter(field => !study[field.name as keyof Study] || study[field.name as keyof Study] === '')
       .map(field => field.label);
+  };
+
+  // Function to get the next section to focus on
+  const getNextSection = (): string | null => {
+    if (!study) return null;
+    
+    const requiredFields = [
+      { name: 'description', label: 'Description' },
+      { name: 'objective', label: 'Objective' },
+      { name: 'study_type', label: 'Study Type' },
+      { name: 'target_audience', label: 'Target Audience' },
+      { name: 'research_questions', label: 'Research Questions' }
+    ];
+    
+    // Find the first empty field
+    for (const field of requiredFields) {
+      if (!study[field.name as keyof Study] || study[field.name as keyof Study] === '') {
+        return field.name;
+      }
+    }
+    
+    return null;
+  };
+
+  // Function to extract questions from a message
+  const extractQuestions = (content: string): string | null => {
+    console.log('Extracting questions from content:', content);
+    
+    // Look for numbered questions (1., 2., etc.)
+    const questionLines = content
+      .split('\n')
+      .filter(line => {
+        const matches = line.match(/^\d+\./);
+        console.log('Checking line for numbered questions:', line, 'matches:', matches);
+        return matches;
+      })
+      .join('\n');
+    
+    if (questionLines) {
+      console.log('Found numbered questions:', questionLines);
+      return questionLines;
+    }
+    
+    // If no numbered questions found, look for question marks
+    const questionMarkLines = content
+      .split('\n')
+      .filter(line => {
+        const hasQuestionMark = line.includes('?');
+        console.log('Checking line for question marks:', line, 'has question mark:', hasQuestionMark);
+        return hasQuestionMark;
+      })
+      .join('\n');
+    
+    console.log('Found question mark lines:', questionMarkLines);
+    return questionMarkLines || null;
+  };
+
+  // Function to check if current section is complete
+  const isCurrentSectionComplete = () => {
+    if (!study) return false;
+    
+    console.log('Checking section completion:', {
+      activeSection,
+      study,
+      pendingQuestions,
+      questionsApproved
+    });
+    
+    switch (activeSection) {
+      case 'description':
+        return Boolean(study.description?.trim());
+      case 'objective':
+        return Boolean(study.objective?.trim());
+      case 'study_type':
+        return Boolean(study.study_type);
+      case 'target_audience':
+        return Boolean(study.target_audience?.trim());
+      case 'research_questions':
+        // Show next button if we have either approved questions or pending questions
+        const hasQuestions = Boolean(study.research_questions) || Boolean(pendingQuestions);
+        console.log('Research questions section completion:', {
+          hasApprovedQuestions: Boolean(study.research_questions),
+          hasPendingQuestions: Boolean(pendingQuestions),
+          hasQuestions
+        });
+        return hasQuestions;
+      default:
+        return false;
+    }
+  };
+
+  // Update useEffect to check section completion
+  useEffect(() => {
+    console.log('Section completion effect triggered:', {
+      study,
+      activeSection,
+      pendingQuestions,
+      questionsApproved
+    });
+    setShowNextButton(isCurrentSectionComplete());
+  }, [study, activeSection, pendingQuestions, questionsApproved]);
+
+  // Function to handle moving to the next section
+  const handleNextSection = async () => {
+    if (!study) return;
+    
+    const nextSection = getNextSection();
+    if (!nextSection) return;
+    
+    setActiveSection(nextSection);
+    setShowNextButton(false);
+    
+    try {
+      setIsTyping(true);
+      
+      // Call the GPT API with a specific next action
+      const response = await fetch('/api/gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [],
+          study: study,
+          isEditing: isEditing,
+          payload: {
+            action: 'next'
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get response from GPT API');
+      }
+
+      const responseData = await response.json();
+      console.log('GPT API Response:', responseData);
+      
+      if (responseData.content) {
+        for (const gptMessage of responseData.content) {
+          if (gptMessage.type === 'message') {
+            setMessages(prev => [...prev, { role: 'assistant', content: gptMessage.content }]);
+            
+            // Check for research questions in the message
+            const questions = extractQuestions(gptMessage.content);
+            if (questions) {
+              console.log('Detected research questions:', questions);
+              setPendingQuestions(questions);
+              setActiveSection('research_questions');
+              setShowNextButton(true);
+            } else if (!gptMessage.content.includes('Click "Next" to continue')) {
+              // Show next button for regular responses that don't explicitly mention the next button
+              setShowNextButton(true);
+            }
+          } else if (gptMessage.type === 'field_update') {
+            console.log('Processing field update:', gptMessage);
+            const updatedStudy = { ...study, [gptMessage.field]: gptMessage.value };
+            setStudy(updatedStudy);
+            
+            const { error } = await supabase
+              .from('studies')
+              .update({ [gptMessage.field]: gptMessage.value })
+              .eq('id', study.id);
+              
+            if (error) {
+              console.error('Error updating study field:', error);
+            }
+            
+            // Show next button after field updates
+            setShowNextButton(true);
+          } else if (gptMessage.type === 'focus') {
+            console.log('Setting focus section:', gptMessage.section);
+            // Always use research_questions, never interview_questions
+            const section = gptMessage.section === 'interview_questions' ? 'research_questions' : gptMessage.section;
+            setActiveSection(section);
+            // If we're focusing on research questions, show the next button
+            if (section === 'research_questions') {
+              setShowNextButton(true);
+            }
+          } else if (gptMessage.type === 'study_type_options') {
+            setStudyTypeOptions(gptMessage.options);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'I apologize, but I encountered an error. Please try again.' 
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Function to handle approving research questions
+  const handleApproveQuestions = async () => {
+    if (!study || !pendingQuestions) return;
+    
+    try {
+      // Update study with research questions
+      const updatedStudy = { ...study, research_questions: pendingQuestions };
+      setStudy(updatedStudy);
+      
+      // Update in Supabase
+      const { error } = await supabase
+        .from('studies')
+        .update({ research_questions: pendingQuestions })
+        .eq('id', study.id);
+        
+      if (error) {
+        console.error('Error saving research questions:', error);
+        return;
+      }
+      
+      // Mark questions as approved
+      setQuestionsApproved(true);
+      
+      // Add confirmation message
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Great! I\'ve saved these research questions. Click "Complete Setup" when you\'re ready to finalize your study.' 
+      }]);
+      
+    } catch (error) {
+      console.error('Error approving questions:', error);
+    }
+  };
+
+  // Function to handle completing the setup
+  const handleCompleteSetup = async () => {
+    if (!study) return;
+
+    try {
+      setIsTyping(true);
+      
+      // Get missing fields
+      const missingFields = getMissingFields(study);
+      console.log('Starting setup with missing fields:', missingFields);
+      
+      // If only research questions are missing, set the active section immediately
+      if (missingFields.length === 1 && missingFields[0] === 'Research Questions') {
+        console.log('Only research questions are missing, setting active section');
+        setActiveSection('research_questions');
+        setShowNextButton(true);
+      }
+      
+      // Call the GPT API
+      const response = await fetch('/api/gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [],
+          study: study,
+          isEditing: isEditing,
+          isInitialSetup: true,
+          missingFields: missingFields
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start setup');
+      }
+
+      const responseData = await response.json();
+      console.log('GPT API Response:', responseData);
+      
+      if (responseData.content) {
+        // Process response
+        for (const gptMessage of responseData.content) {
+          if (gptMessage.type === 'message' && gptMessage.content) {
+            // Ensure content is always a string
+            const messageContent = String(gptMessage.content);
+            setMessages(prev => [...prev, { role: 'assistant', content: messageContent }]);
+            
+            // Check for research questions in the message
+            const questions = extractQuestions(messageContent);
+            if (questions) {
+              console.log('Setting states for research questions:', {
+                questions,
+                activeSection: 'research_questions',
+                showNextButton: true
+              });
+              setPendingQuestions(questions);
+              setActiveSection('research_questions');
+              setShowNextButton(true);
+            }
+          } else if (gptMessage.type === 'focus' && gptMessage.section) {
+            setActiveSection(gptMessage.section);
+          } else if (gptMessage.type === 'field_update' && gptMessage.field === 'research_questions') {
+            setPendingQuestions(gptMessage.value);
+            setShowNextButton(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error starting setup:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'I apologize, but I encountered an error while starting the setup. Please try again.' 
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Function to handle selecting a study type
+  const handleSelectStudyType = async (type: string) => {
+    if (!study) return;
+    
+    try {
+      // Convert type to proper study type enum
+      const studyType = type.toLowerCase() as "exploratory" | "comparative" | "attitudinal" | "behavioral";
+      
+      // Update the study field
+      const updatedStudy = { ...study, study_type: studyType };
+      setStudy(updatedStudy);
+      
+      // Update the field in Supabase
+      const { error } = await supabase
+        .from('studies')
+        .update({ study_type: studyType })
+        .eq('id', study.id);
+        
+      if (error) {
+        console.error('Error updating study type:', error);
+      }
+      
+      // Add a message to the chat
+      setMessages(prev => [...prev, { 
+        role: 'assistant' as const,
+        content: `Great! You've selected the ${type} study type. Click the "Next" button to continue to the next section.` 
+      }]);
+      
+      // Next button visibility will be handled by useEffect
+    } catch (error) {
+      console.error('Error selecting study type:', error);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -134,35 +500,7 @@ export default function StudySetupPage() {
         .eq('id', user.id)
         .single();
 
-      // Check which fields are missing
-      const missingFields = getMissingFields(study);
-      
-      // Prepare the payload for the GPT API
-      const payload = {
-        study: {
-          id: study.id,
-          title: study.title,
-          description: study.description || '',
-          objective: study.objective || '',
-          study_type: study.study_type || '',
-          target_audience: study.target_audience || '',
-          interview_questions: study.interview_questions || '',
-          locked_fields: study.locked_fields || []
-        },
-        userContext: {
-          name: profile?.full_name || 'User',
-          role: profile?.role || 'Researcher',
-          company: profile?.company || '',
-          bio: profile?.bio || ''
-        },
-        message: inputMessage,
-        missingFields: missingFields,
-        activeSection: activeSection
-      };
-
-      console.log('Sending message to GPT API:', payload);
-
-      // Call the GPT API
+      // Regular message handling
       const response = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
@@ -172,7 +510,26 @@ export default function StudySetupPage() {
           messages: [
             {
               role: 'user',
-              content: JSON.stringify(payload)
+              content: JSON.stringify({
+                study: {
+                  id: study.id,
+                  title: study.title,
+                  description: study.description || '',
+                  objective: study.objective || '',
+                  study_type: study.study_type || '',
+                  target_audience: study.target_audience || '',
+                  research_questions: study.research_questions || '',
+                  locked_fields: study.locked_fields || []
+                },
+                userContext: {
+                  name: profile?.full_name || 'User',
+                  role: profile?.role || 'Researcher',
+                  company: profile?.company || '',
+                  bio: profile?.bio || ''
+                },
+                message: inputMessage,
+                activeSection: activeSection
+              })
             }
           ],
           study: study,
@@ -180,34 +537,45 @@ export default function StudySetupPage() {
         }),
       });
 
-      console.log('GPT API response status:', response.status);
-      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('GPT API error:', errorData);
         throw new Error(errorData.error || 'Failed to get response from GPT API');
       }
 
       const responseData = await response.json();
-      console.log('GPT API response data:', responseData);
+      console.log('GPT API Response:', responseData);
       
-      // Check if the response has content
       if (!responseData.content || !Array.isArray(responseData.content)) {
-        console.error('Invalid response format:', responseData);
         throw new Error('Invalid response format from GPT API');
       }
       
       // Process each message from GPT
       for (const gptMessage of responseData.content) {
+        console.log('Processing GPT message:', gptMessage);
+        
         if (gptMessage.type === 'message') {
-          // Add assistant message to chat
           setMessages(prev => [...prev, { role: 'assistant', content: gptMessage.content }]);
+          
+          // Check for research questions in the message
+          const questions = extractQuestions(gptMessage.content);
+          if (questions) {
+            console.log('Setting states for research questions:', {
+              questions,
+              activeSection: 'research_questions',
+              showNextButton: true
+            });
+            setPendingQuestions(questions);
+            setActiveSection('research_questions');
+            setShowNextButton(true);
+          } else if (!gptMessage.content.includes('Click "Next" to continue')) {
+            // Show next button for regular responses that don't explicitly mention the next button
+            setShowNextButton(true);
+          }
         } else if (gptMessage.type === 'field_update') {
-          // Update the study field
+          console.log('Processing field update:', gptMessage);
           const updatedStudy = { ...study, [gptMessage.field]: gptMessage.value };
           setStudy(updatedStudy);
           
-          // Update the field in Supabase
           const { error } = await supabase
             .from('studies')
             .update({ [gptMessage.field]: gptMessage.value })
@@ -216,29 +584,24 @@ export default function StudySetupPage() {
           if (error) {
             console.error('Error updating study field:', error);
           }
-        } else if (gptMessage.type === 'focus') {
-          // Set the active section to focus on
-          setActiveSection(gptMessage.section);
-        } else if (gptMessage.type === 'complete') {
-          // Mark the study as complete
-          setIsComplete(true);
           
-          // Update the study in Supabase
-          const { error } = await supabase
-            .from('studies')
-            .update({ 
-              inception_complete: true,
-              status: 'active'
-            })
-            .eq('id', study.id);
-            
-          if (error) {
-            console.error('Error marking study as complete:', error);
+          // Show next button after field updates
+          setShowNextButton(true);
+        } else if (gptMessage.type === 'focus') {
+          console.log('Setting focus section:', gptMessage.section);
+          // Always use research_questions, never interview_questions
+          const section = gptMessage.section === 'interview_questions' ? 'research_questions' : gptMessage.section;
+          setActiveSection(section);
+          // If we're focusing on research questions, show the next button
+          if (section === 'research_questions') {
+            setShowNextButton(true);
           }
+        } else if (gptMessage.type === 'study_type_options') {
+          setStudyTypeOptions(gptMessage.options);
         }
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'I apologize, but I encountered an error. Please try again or contact support if the issue persists.' 
@@ -248,17 +611,14 @@ export default function StudySetupPage() {
     }
   };
 
-  const handleCompleteSetup = async () => {
+  // Add a separate function for final completion
+  const handleFinalCompletion = async () => {
     if (!study) return;
     
     try {
-      setLoading(true);
-      setApiCallFailed(false);
-
-      // Get missing fields
-      const missingFields = getMissingFields(study);
+      setIsTyping(true);
       
-      // Call GPT API directly without adding a user message
+      // Call the GPT API with complete_setup action
       const response = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
@@ -268,105 +628,48 @@ export default function StudySetupPage() {
           messages: [],
           study: study,
           isEditing: isEditing,
-          isInitialSetup: true // Add a flag to indicate this is the initial setup
+          payload: {
+            action: 'complete_setup'
+          }
         }),
       });
 
-      console.log('Complete setup API response status:', response.status);
-      
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Complete setup API error:', errorData);
-        throw new Error(errorData.error || 'Failed to get response from GPT API');
+        throw new Error('Failed to complete setup');
       }
 
       const responseData = await response.json();
-      console.log('Complete setup API response data:', responseData);
       
-      // Check if the response has content
-      if (!responseData.content || !Array.isArray(responseData.content)) {
-        console.error('Invalid response format from complete setup:', responseData);
-        throw new Error('Invalid response format from GPT API');
-      }
-      
-      // Process each message from GPT
-      for (const gptMessage of responseData.content) {
-        if (gptMessage.type === 'message') {
-          // Add assistant message to chat
-          setMessages(prev => [...prev, { role: 'assistant', content: gptMessage.content }]);
-        } else if (gptMessage.type === 'field_update') {
-          // Update the study field
-          const updatedStudy = { ...study, [gptMessage.field]: gptMessage.value };
-          setStudy(updatedStudy);
-          
-          // Update the field in Supabase
-          const { error } = await supabase
-            .from('studies')
-            .update({ [gptMessage.field]: gptMessage.value })
-            .eq('id', study.id);
-            
-          if (error) {
-            console.error('Error updating study field:', error);
-          }
-        } else if (gptMessage.type === 'focus') {
-          // Set the active section to focus on
-          setActiveSection(gptMessage.section);
-        } else if (gptMessage.type === 'complete') {
-          // Mark the study as complete
-          setIsComplete(true);
-          
-          // Update the study in Supabase
-          const { error } = await supabase
-            .from('studies')
-            .update({ 
-              inception_complete: true,
-              status: 'active'
-            })
-            .eq('id', study.id);
-            
-          if (error) {
-            console.error('Error marking study as complete:', error);
+      if (responseData.content) {
+        // Process completion response
+        for (const gptMessage of responseData.content) {
+          if (gptMessage.type === 'message') {
+            setMessages(prev => [...prev, { role: 'assistant', content: gptMessage.content }]);
+          } else if (gptMessage.type === 'complete') {
+            setIsComplete(true);
+            // Update study status
+            const { error } = await supabase
+              .from('studies')
+              .update({ 
+                inception_complete: true,
+                status: 'active'
+              })
+              .eq('id', study.id);
+              
+            if (error) {
+              console.error('Error marking study as complete:', error);
+            }
           }
         }
       }
     } catch (error) {
-      console.error('Error in setup:', error);
-      setApiCallFailed(true);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'I encountered an issue processing your request. Please try again.'
+      console.error('Error completing setup:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'I apologize, but I encountered an error while completing the setup. Please try again.' 
       }]);
     } finally {
-      setLoading(false);
       setIsTyping(false);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editedStudy) return;
-    
-    try {
-      const { error } = await supabase
-        .from('studies')
-        .update({
-          title: editedStudy.title,
-          description: editedStudy.description,
-          objective: editedStudy.objective,
-          study_type: editedStudy.study_type,
-          target_audience: editedStudy.target_audience,
-          research_questions: editedStudy.research_questions,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editedStudy.id);
-      
-      if (error) throw error;
-      
-      setStudy(editedStudy);
-      setIsEditing(false);
-      setEditedStudy(null);
-    } catch (err) {
-      console.error('Error updating study:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update study');
     }
   };
 
@@ -451,6 +754,38 @@ export default function StudySetupPage() {
                     {message.content}
                   </div>
                 ))}
+                
+                {/* Study Type Options */}
+                {activeSection === 'study_type' && studyTypeOptions.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {studyTypeOptions.map((option, index) => {
+                      // Skip rendering if value is undefined
+                      if (!option?.value) return null;
+                      
+                      const studyType = option.value.toLowerCase();
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleSelectStudyType(studyType)}
+                          className={`w-full p-3 rounded-lg border text-left transition-all ${
+                            study?.study_type === studyType
+                              ? 'bg-orange-50 border-orange-300'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium capitalize">{option.value}</span>
+                            {option.recommended && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Recommended</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">{option.description || ''}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                
                 {isTyping && (
                   <div className="text-black mr-auto max-w-[80%] text-sm">
                     <div className="flex space-x-2">
@@ -462,6 +797,45 @@ export default function StudySetupPage() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
+              
+              {/* Next/Complete Button */}
+              {(() => {
+                console.log('Button visibility conditions:', {
+                  showNextButton,
+                  activeSection,
+                  pendingQuestions,
+                  questionsApproved
+                });
+                return null;
+              })()}
+              {showNextButton && (
+                <div className="flex justify-center mb-4">
+                  {activeSection === 'research_questions' && pendingQuestions && !questionsApproved ? (
+                    <button
+                      onClick={handleApproveQuestions}
+                      className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-full shadow-lg backdrop-blur-sm bg-opacity-80 hover:bg-opacity-90 transition-all border border-gray-200"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>Approve Questions</span>
+                    </button>
+                  ) : activeSection === 'research_questions' && questionsApproved ? (
+                    <button
+                      onClick={handleFinalCompletion}
+                      className="flex items-center gap-2 px-6 py-2 bg-black text-white rounded-full shadow-lg backdrop-blur-sm bg-opacity-80 hover:bg-opacity-90 transition-all"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>Complete Setup</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleNextSection}
+                      className="px-6 py-2 bg-white text-black rounded-full shadow-lg backdrop-blur-sm bg-opacity-80 hover:bg-opacity-90 transition-all border border-gray-200"
+                    >
+                      Next
+                    </button>
+                  )}
+                </div>
+              )}
               
               {/* Input area */}
               <div className="flex items-center gap-2 bg-black p-2 rounded-full">
@@ -533,4 +907,4 @@ export default function StudySetupPage() {
       </div>
     </MainLayout>
   );
-} 
+}

@@ -12,7 +12,7 @@ import { useOnboardingTasks } from '@/hooks/useOnboardingTasks';
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', disabled: false },
   { name: 'Studies', path: '/studies', disabled: false },
-  { name: 'Interviewer', path: '/interviewer', disabled: true, comingSoon: true },
+  { name: 'Interviewer', path: '/interviewer', disabled: false },
   { name: 'Insights', path: '/insights', disabled: true, comingSoon: true },
 ];
 

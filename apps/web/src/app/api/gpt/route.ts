@@ -162,6 +162,10 @@ export async function POST(req: Request) {
     const action = payload?.action ?? null;
     const selectedStudyType = payload?.selectedStudyType ?? null;
 
+    console.log('Request payload:', payload);
+    console.log('Extracted action:', action);
+    console.log('Selected study type:', selectedStudyType);
+
     if (!messages || !Array.isArray(messages)) {
       console.error('Invalid messages format:', messages);
       return NextResponse.json(
@@ -176,6 +180,116 @@ export async function POST(req: Request) {
         { error: 'Study details are required' },
         { status: 400 }
       );
+    }
+    
+    // Handle interview guide generation
+    if (action === 'generate_interview_guide') {
+      const prompt = messages[0]?.content;
+      if (!prompt) {
+        console.error('No prompt provided for interview guide generation');
+        return NextResponse.json(
+          { error: 'Prompt is required for interview guide generation' },
+          { status: 400 }
+        );
+      }
+
+      console.log('Generating interview guide with prompt:', prompt);
+
+      // Extract the actual prompt from the JSON string if needed
+      let actualPrompt = prompt;
+      try {
+        const parsedPrompt = JSON.parse(prompt);
+        if (parsedPrompt.message) {
+          actualPrompt = parsedPrompt.message;
+        }
+      } catch (e) {
+        // If parsing fails, use the prompt as is
+        console.log('Prompt is not JSON, using as is');
+      }
+
+      // Prepare messages for the chat completion
+      const systemMessage: ChatCompletionSystemMessageParam = {
+        role: 'system',
+        content: `You are an expert research interviewer. Your task is to generate a detailed interview guide based on the provided study details and researcher information. Format your response as a JSON object with the following structure:
+{
+  "questions": [
+    {
+      "id": "unique_id",
+      "question": "main question",
+      "sub_questions": [
+        {
+          "id": "unique_id",
+          "question": "follow-up question",
+          "notes": "optional notes for the interviewer"
+        }
+      ],
+      "notes": "optional notes for the interviewer"
+    }
+  ],
+  "instructions": "detailed instructions for conducting the interview",
+  "system_prompt": "prompt for the interviewer",
+  "duration_minutes": 60,
+  "supplementary_materials": {
+    "preparation": ["item 1", "item 2"],
+    "resources": ["resource 1", "resource 2"]
+  }
+}`
+      };
+
+      const chatMessages: ChatCompletionMessageParam[] = [
+        systemMessage,
+        { role: 'user', content: actualPrompt } as ChatCompletionUserMessageParam
+      ];
+
+      console.log('Sending request to OpenAI with messages:', JSON.stringify(chatMessages, null, 2));
+
+      try {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4-turbo-preview',
+          messages: chatMessages,
+          temperature: 0.7,
+          max_tokens: 2000,
+          response_format: { type: "json_object" }
+        });
+
+        console.log('OpenAI response:', completion.choices[0].message.content);
+
+        // Parse the response to ensure it's valid JSON
+        let interviewGuide;
+        const content = completion.choices[0].message.content;
+        if (!content) {
+          console.error('No content in OpenAI response');
+          return NextResponse.json(
+            { error: 'Empty response from OpenAI' },
+            { status: 500 }
+          );
+        }
+
+        try {
+          interviewGuide = JSON.parse(content);
+        } catch (e) {
+          console.error('Failed to parse OpenAI response as JSON:', e);
+          return NextResponse.json(
+            { error: 'Invalid response format from OpenAI' },
+            { status: 500 }
+          );
+        }
+
+        // Return the interview guide directly
+        return NextResponse.json({
+          content: interviewGuide
+        });
+      } catch (error) {
+        console.error('Error generating interview guide:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+          console.error('Error stack:', error.stack);
+        }
+        return NextResponse.json(
+          { error: 'Failed to generate interview guide', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
     }
     
     // If this is the initial setup, we don't need to process any messages

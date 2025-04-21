@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 -40 249 250">
+  <style>
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @keyframes pulseStrong {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    @keyframes pulseMedium {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    .top-wave {
+      animation: pulseStrong 1.2s ease-in-out infinite;
+      transform-origin: center;
+    }
+    .bottom-wave {
+      animation: pulse 0.8s ease-in-out infinite;
+      transform-origin: center;
+    }
+    .main-shape {
+      animation: pulseMedium 1s ease-in-out infinite;
+      transform-origin: center;
+    }
+  </style>
+  <rect x="-40" y="-40" width="249" height="250" fill="transparent"/>
+  <defs>
+    <clipPath id="clip0_34_526">
+      <rect x="-20" y="-20" width="208.048" height="210" fill="#202020"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#clip0_34_526)">
+    <path class="bottom-wave" d="M20.707 114.765C20.2835 114.606 19.8571 114.451 19.4291 114.301C9.93003 110.983 0 118.052 0 128.114C0 151.247 18.7531 170 41.8862 170H41.8869C51.9579 170 59.0158 160.057 55.6918 150.55C49.9222 134.051 37.0332 120.894 20.707 114.765Z" fill="#202020"/>
+    <path class="top-wave" d="M132.231 1.2912C131.808 1.13231 131.381 0.977915 130.954 0.828017C121.454 -2.49074 111.524 4.57848 111.524 14.6404C111.524 37.7735 130.277 56.5266 153.411 56.5266H153.411C163.482 56.5266 170.54 46.5838 167.216 37.0765C161.447 20.5772 148.558 7.42056 132.231 1.2912Z" fill="#202020"/>
+    <path class="main-shape" d="M154.802 85.5823C144.931 84.1073 135.623 80.9115 127.193 76.3089C104.62 63.9857 88.342 41.5811 84.4101 15.1472C83.3458 7.99481 77.1828 2.71313 69.9517 2.71313C31.319 2.71313 0.000732422 34.0314 0.000732422 72.6641C0.000732422 79.9207 5.32438 86.059 12.5008 87.1323C23.0596 88.7115 32.9747 92.2611 41.8599 97.3951C63.5 109.897 79.0288 131.797 82.8707 157.516C83.9417 164.686 90.0868 169.999 97.3366 169.999C135.97 169.999 167.288 138.681 167.288 100.048C167.288 92.797 161.974 86.6526 154.803 85.5816L154.802 85.5823Z" fill="#202020"/>
+  </g>
+</svg>

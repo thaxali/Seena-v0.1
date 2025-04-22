@@ -1,0 +1,79 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import MainLayout from '@/components/layout/MainLayout';
+import { supabase } from '@/lib/supabase';
+import { Study } from '@/types/study';
+import { GPTMessage } from '@/types/gpt';
+import { ChevronLeft, Send, ArrowUp, Pencil, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import PrimaryButton from '@/components/ui/PrimaryButton';
+import Image from 'next/image';
+
+interface StudyTypeOption {
+  value: string;
+  label: string;
+  description: string;
+  recommended?: boolean;
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export default function StudySetupPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const [study, setStudy] = useState<Study | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const [apiCallInitiated, setApiCallInitiated] = useState(false);
+  const [apiCallFailed, setApiCallFailed] = useState(false);
+  const [showNextButton, setShowNextButton] = useState(false);
+  const [studyTypeOptions, setStudyTypeOptions] = useState<StudyTypeOption[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const autoStart = searchParams.get('autoStart') === 'true';
+  const isEditing = searchParams.get('edit') === 'true';
+  const [pendingQuestions, setPendingQuestions] = useState<string | null>(null);
+  const [questionsApproved, setQuestionsApproved] = useState(false);
+
+  // ... rest of the component code ...
+
+  return (
+    <MainLayout>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <button 
+                onClick={() => router.push(`/studies/${id}`)}
+                className="p-1 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors"
+                aria-label="Back to study"
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <h1 className="text-3xl font-bold text-gray-900">Set up {study?.title}</h1>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content - split into two halves horizontally */}
+        <div className="bg-white rounded-lg border border-gray-300 p-6 pb-5 min-h-[calc(100vh-12rem)] flex flex-col">
+          {/* ... rest of the component JSX ... */}
+        </div>
+      </div>
+    </MainLayout>
+  );
+} 

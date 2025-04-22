@@ -6,14 +6,15 @@ import { useProfile } from '@/contexts/ProfileContext';
 import Link from 'next/link';
 import OnboardingTasks from '@/components/onboarding/OnboardingTasks';
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, ClipboardList, Users, BarChart2 } from 'lucide-react';
 import { useOnboardingTasks } from '@/hooks/useOnboardingTasks';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
-  { name: 'Dashboard', path: '/dashboard', disabled: false },
-  { name: 'Studies', path: '/studies', disabled: false },
-  { name: 'Interviewer', path: '/interviewer', disabled: true, comingSoon: true },
-  { name: 'Insights', path: '/insights', disabled: true, comingSoon: true },
+  { name: 'Dashboard', path: '/dashboard', disabled: false, icon: LayoutDashboard },
+  { name: 'Studies', path: '/studies', disabled: false, icon: ClipboardList },
+  { name: 'Interviewer', path: '/interviewer', disabled: false, icon: Users },
+  { name: 'Insights', path: '/insights', disabled: true, comingSoon: true, icon: BarChart2 },
 ];
 
 export default function SideNav() {
@@ -22,6 +23,54 @@ export default function SideNav() {
   const { isProfileComplete } = useProfile();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { tasks } = useOnboardingTasks();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Fetch user's avatar
+  useEffect(() => {
+    async function fetchUserAvatar() {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        if (data) {
+          setAvatarUrl(data.avatar_url);
+        }
+      } catch (error) {
+        console.error('Error fetching user avatar:', error);
+      }
+    }
+    
+    fetchUserAvatar();
+
+    // Subscribe to profile changes
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user?.id}`,
+        },
+        (payload) => {
+          if (payload.new.avatar_url !== payload.old.avatar_url) {
+            setAvatarUrl(payload.new.avatar_url);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     try {
@@ -42,20 +91,22 @@ export default function SideNav() {
     <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-300 flex flex-col">
       {/* Logo */}
       <div className="p-6 flex items-center gap-2">
-        <img 
-          src="/alpha-logo.svg" 
-          alt="Seenazero Logo" 
-          className="h-8 w-auto"
-        />
-        <span className="text-gray-400 text-lg">/</span>
         <Link 
           href="/profile" 
           className="flex items-center gap-2 group hover:text-orange-500 transition-colors"
         >
-          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white font-medium">
-            {user?.email?.[0].toUpperCase() || 'U'}
+          <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-medium overflow-hidden">
+            {avatarUrl ? (
+              <img 
+                src={avatarUrl} 
+                alt="Profile" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              user?.user_metadata?.display_name?.[0].toUpperCase() || user?.email?.[0].toUpperCase() || 'U'
+            )}
           </div>
-          <span className="text-sm font-medium text-gray-700 group-hover:text-orange-500">
+          <span className="text-lg font-medium text-gray-700 group-hover:text-orange-500">
             {user?.user_metadata?.display_name || user?.email || 'User'}
           </span>
         </Link>
@@ -68,6 +119,7 @@ export default function SideNav() {
             <li key={item.path}>
               {item.disabled ? (
                 <div className="flex items-center px-4 py-2 text-gray-400 cursor-not-allowed">
+                  <item.icon className="w-5 h-5 mr-3" />
                   <span>{item.name}</span>
                   {item.comingSoon && (
                     <span className="ml-2 text-[10px] text-gray-400">
@@ -80,6 +132,7 @@ export default function SideNav() {
                   href={item.path}
                   className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
+                  <item.icon className="w-5 h-5 mr-3" />
                   {item.name}
                 </Link>
               )}

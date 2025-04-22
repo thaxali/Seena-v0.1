@@ -43,7 +43,7 @@ const systemPrompt = `You are a UX research assistant helping users set up a res
    – On user approval **or** \`{ "action":"complete_setup" }\`, save questions and reply with \`{ "type":"complete","value":true }\`.  
 6. Valid response object types: \`message | field_update | focus | study_type_options | complete\`.
 
-Required field order: description ▸ study_type ▸ objective ▸ target_audience ▸ interview_questions`;
+Required field order: description ▸ objective ▸ study_type ▸  target_audience ▸ interview_questions`;
 
 const NEXT_ACTION = 'next';
 const COMPLETE_SETUP_ACTION = 'complete_setup';
@@ -162,6 +162,10 @@ export async function POST(req: Request) {
     const action = payload?.action ?? null;
     const selectedStudyType = payload?.selectedStudyType ?? null;
 
+    console.log('Request payload:', payload);
+    console.log('Extracted action:', action);
+    console.log('Selected study type:', selectedStudyType);
+
     if (!messages || !Array.isArray(messages)) {
       console.error('Invalid messages format:', messages);
       return NextResponse.json(
@@ -176,6 +180,141 @@ export async function POST(req: Request) {
         { error: 'Study details are required' },
         { status: 400 }
       );
+    }
+    
+    // Handle interview guide generation
+    if (action === 'generate_interview_guide') {
+      const prompt = messages[0]?.content;
+      if (!prompt) {
+        console.error('No prompt provided for interview guide generation');
+        return NextResponse.json(
+          { error: 'Prompt is required for interview guide generation' },
+          { status: 400 }
+        );
+      }
+
+      console.log('Generating interview guide with prompt:', prompt);
+
+      // Extract the actual prompt from the JSON string if needed
+      let actualPrompt = prompt;
+      try {
+        const parsedPrompt = JSON.parse(prompt);
+        if (parsedPrompt.message) {
+          actualPrompt = parsedPrompt.message;
+        }
+      } catch (e) {
+        // If parsing fails, use the prompt as is
+        console.log('Prompt is not JSON, using as is');
+      }
+
+      // Prepare messages for the chat completion
+      const systemMessage: ChatCompletionSystemMessageParam = {
+        role: 'system',
+        content: `You are an expert research interviewer. Your task is to generate a detailed interview guide based on the provided study details and researcher information.
+
+          Make sure to help the user come up with questions that are relevant to the study and the user's needs.
+          Make sure to generate a prompt for a voice assistant to follow.
+          In the "system_prompt" string, include a formatted list of the same questions and subquestions you're generating in the "questions" array. This is required so the voice interviewer agent has the full question set embedded in its prompt. Format them clearly with numbering or bullets inside the prompt itself.
+          Create instructions for a human interviewer to follow. Make sure to look at their profile and role and adjust the level of coaching details accordingly.
+          Estimate the duration of the interview in minutes assuming each question takes 1-3 minutes to answer.
+
+          Format your response as a JSON object with the following structure:
+
+
+{
+  "questions": [
+    {
+      "id": "unique_id",
+      "question": "main question",
+      "sub_questions": [
+        {
+          "id": "unique_id",
+          "question": "follow-up question",
+          "notes": "optional notes for the interviewer"
+        }
+      ],
+      "notes": "optional notes for the interviewer"
+    }
+  ],
+  "instructions": "instructions for conducting the interview for a human interviewer to follow",
+  "system_prompt": "You are Seena, an AI-powered voice research assistant conducting a user interview. Your role is to gather qualitative insights in a natural, conversational way.
+        GUIDELINES:
+        1. Engage Like a Skilled Interviewer
+          - Speak in a professional yet warm tone.
+          - Use active listening techniques (e.g., "That's interesting, could you expand on that?").
+          - Avoid robotic repetition of the interviewee's answers.
+
+        2. Dynamically Adjust the Interview Flow
+          - Follow the structured question set, but modify or skip questions if the user already provided that information.
+          - Ask relevant follow-up questions based on the user's responses.
+
+        3. Extract Actionable Insights
+          - Identify pain points, challenges, and goals from the user's answers.
+          - Summarize key themes in real-time without interrupting.
+        4. make sure to ask the questions and subquestions listed in the questions array [include the full questions list here]
+        5. make sure the duration of the interview does not exceet the duration_minutes listed in the payload
+        6. Thank You & Wrap-Up
+          - Thank you for your time. Have a great day.
+",
+  "duration_minutes": roughly estimate the duration of the interview in minutes assuming each question including subquestions takes 1-3 minute to answer,
+  }
+}`
+      };
+
+      const chatMessages: ChatCompletionMessageParam[] = [
+        systemMessage,
+        { role: 'user', content: actualPrompt } as ChatCompletionUserMessageParam
+      ];
+
+      console.log('Sending request to OpenAI with messages:', JSON.stringify(chatMessages, null, 2));
+
+      try {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4-turbo-preview',
+          messages: chatMessages,
+          temperature: 0.7,
+          max_tokens: 2000,
+          response_format: { type: "json_object" }
+        });
+
+        console.log('OpenAI response:', completion.choices[0].message.content);
+
+        // Parse the response to ensure it's valid JSON
+        let interviewGuide;
+        const content = completion.choices[0].message.content;
+        if (!content) {
+          console.error('No content in OpenAI response');
+          return NextResponse.json(
+            { error: 'Empty response from OpenAI' },
+            { status: 500 }
+          );
+        }
+
+        try {
+          interviewGuide = JSON.parse(content);
+        } catch (e) {
+          console.error('Failed to parse OpenAI response as JSON:', e);
+          return NextResponse.json(
+            { error: 'Invalid response format from OpenAI' },
+            { status: 500 }
+          );
+        }
+
+        // Return the interview guide directly
+        return NextResponse.json({
+          content: interviewGuide
+        });
+      } catch (error) {
+        console.error('Error generating interview guide:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+          console.error('Error stack:', error.stack);
+        }
+        return NextResponse.json(
+          { error: 'Failed to generate interview guide', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
     }
     
     // If this is the initial setup, we don't need to process any messages
@@ -215,13 +354,13 @@ export async function POST(req: Request) {
           message = "Hello! I'm your research co-pilot, here to help you set up your study. Let's start with a brief description of what this study is about. Can you tell me in one line what you're trying to learn?";
           section = 'description';
           break;
-        case 'study_type':
-          message = "Here are the study types. Pick one or ask me about them.";
-          section = 'study_type';
-          break;
         case 'objective':
           message = "Now, let's define the objective of your study. What specific insights or knowledge do you hope to gain from this research?";
           section = 'objective';
+          break;
+          case 'study_type':
+          message = "Here are the study types. Pick one or ask me about them.";
+          section = 'study_type';
           break;
         case 'target_audience':
           message = "Who is your target audience for this study? Please describe the demographic, behaviors, or characteristics of the people you want to learn from.";
@@ -273,7 +412,7 @@ export async function POST(req: Request) {
     
     // Handle Next button
     if (action === NEXT_ACTION) {
-      const order = ['description','study_type','objective','target_audience','interview_questions'];
+      const order = ['description','objective','study_type','target_audience','interview_questions'];
       const next = order.find(f => !isFieldFilled(f, study[f]));
       if (!next) {
         return NextResponse.json({ content:[{type:'message',content:'All sections are complete.'}] });
@@ -284,22 +423,22 @@ export async function POST(req: Request) {
             {type:'message',content:"Let's add a one‑line description—what are you trying to learn?"},
             {type:'focus',section:'description'}
           ]});
-        case 'study_type':
-          return NextResponse.json({ content:[
-            {type:'message',content:"Here are the study types. Pick one or ask me about them."},
-            {type:'study_type_options',options:[
-              {value:'Exploratory',description:'Understand a new problem space',recommended:true},
-              {value:'Comparative',description:'Compare multiple solutions'},
-              {value:'Attitudinal',description:'Opinions & preferences'},
-              {value:'Behavioral',description:'Real‑world behaviours'}
-            ]},
-            {type:'focus',section:'study_type'}
-          ]});
         case 'objective':
           return NextResponse.json({ content:[
             {type:'message',content:"What specific insight do you want from this study?"},
             {type:'focus',section:'objective'}
           ]});
+          case 'study_type':
+            return NextResponse.json({ content:[
+              {type:'message',content:"Here are the study types. Pick one or ask me about them."},
+              {type:'study_type_options',options:[
+                {value:'Exploratory',description:'Understand a new problem space',recommended:true},
+                {value:'Comparative',description:'Compare multiple solutions'},
+                {value:'Attitudinal',description:'Opinions & preferences'},
+                {value:'Behavioral',description:'Real‑world behaviours'}
+              ]},
+              {type:'focus',section:'study_type'}
+            ]});
         case 'target_audience':
           return NextResponse.json({ content:[
             {type:'message',content:"Who do you hope to interview?"},

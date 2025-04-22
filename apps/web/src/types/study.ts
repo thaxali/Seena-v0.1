@@ -8,6 +8,7 @@ export interface Study {
   research_questions: string;
   interview_structure: string;
   interview_format: string;
+  interview_questions: string;
   status: "draft" | "in_progress" | "completed";
   user_id: string;
   created_at: string;

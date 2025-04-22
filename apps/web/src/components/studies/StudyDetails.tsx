@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
-import { MoreVertical, Trash2, ChevronLeft, Bug, Pencil } from 'lucide-react';
+import { MoreVertical, Trash2, ChevronLeft, Bug, Pencil, HelpCircle } from 'lucide-react';
 import AddInterviewDialog from './AddInterviewDialog';
 import { Interview } from "@/lib/services/interview";
 import InterviewDetailsDialog from "@/components/studies/InterviewDetailsDialog";
@@ -13,6 +13,10 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tag } from "@/components/ui/tag";
+import SetupInterviewDialog from './SetupInterviewDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Image from "next/image";
+import StudyProgress from './StudyProgress';
 
 interface StudyDetailsProps {
   id: string;
@@ -31,6 +35,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStudy, setEditedStudy] = useState<Study | null>(null);
+  const [setupInterviewOpen, setSetupInterviewOpen] = useState(false);
+  const [hasInterviewGuide, setHasInterviewGuide] = useState(false);
 
   // Function to check if study setup is complete
   const isStudySetupComplete = (study: Study): boolean => {
@@ -75,6 +81,22 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
         console.log('Study found:', data);
         setStudy(data);
+        
+        // Check if an interview guide exists for this study
+        const { data: guideData, error: guideError } = await supabase
+          .from('interview_guides')
+          .select('id')
+          .eq('study_id', id)
+          .limit(1)
+          .single();
+          
+        if (!guideError && guideData) {
+          console.log('Interview guide exists for this study');
+          setHasInterviewGuide(true);
+        } else {
+          console.log('No interview guide found for this study');
+          setHasInterviewGuide(false);
+        }
       } catch (err) {
         console.error('Error fetching study details:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch study details');
@@ -254,7 +276,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
           <div className="flex items-center gap-4">
             <Tag
               variant={
-                study?.status === 'active' ? 'green' :
+                study?.status === 'in_progress' ? 'green' :
                 study?.status === 'completed' ? 'blue' :
                 'grey'
               }
@@ -269,14 +291,6 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         </div>
         <div className="relative">
           <div className="flex items-center gap-2">
-            <button 
-              className={`p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors ${debugMode ? 'bg-orange-100 border-orange-300' : ''}`}
-              onClick={() => setDebugMode(!debugMode)}
-              aria-label="Toggle debug mode"
-              title="Debug mode"
-            >
-              <Bug className="h-5 w-5 text-gray-600" />
-            </button>
             <button 
               className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors"
               onClick={() => setShowDropdown(!showDropdown)}
@@ -304,46 +318,69 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
       {/* Main content */}
       <div className="space-y-8">
+        {/* Study Progress */}
+        <StudyProgress 
+          study={study}
+          hasInterviewGuide={hasInterviewGuide}
+          interviewsCount={interviews.length}
+        />
+
         {/* Study Details */}
         <div className="bg-white rounded-lg border border-gray-300 p-6">
           <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-semibold text-black">Study Details</h2>
-              {study && !isStudySetupComplete(study) && !isEditing && (
-                <button
-                  className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
-                  style={{ 
-                    '--offset': '1px',
-                    boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                  } as React.CSSProperties}
-                  onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
-                >
-                  <span className="relative z-20">
-                    <span className="text-black text-sm">Set up with Seena's Inception Agent</span>
-                  </span>
-                  <div 
-                    className="absolute top-1/2 left-1/2 animate-spin-slow"
-                    style={{
-                      background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
-                      aspectRatio: '1',
-                      width: '100%',
-                    }}
-                  />
-                  <div 
-                    className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
-                    style={{
-                      boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
-                    }}
-                  />
-                </button>
-              )}
-            </div>
+            <h2 className="text-xl font-semibold text-black">Study Details</h2>
             <div className="flex items-center gap-2">
+              {study && !isStudySetupComplete(study) && !isEditing && (
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
+                          style={{ 
+                            '--offset': '1px',
+                            boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                          } as React.CSSProperties}
+                          onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
+                        >
+                          <span className="relative z-20 flex items-center gap-2">
+                            <Image
+                              src="/liquidBlack.svg"
+                              alt="Seena Logo"
+                              width={16}
+                              height={16}
+                              className="opacity-90"
+                            />
+                            <span className="text-black text-sm">1. Study planner</span>
+                          </span>
+                          <div 
+                            className="absolute top-1/2 left-1/2 animate-spin-slow"
+                            style={{
+                              background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
+                              aspectRatio: '1',
+                              width: '100%',
+                            }}
+                          />
+                          <div 
+                            className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
+                            style={{
+                              boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
+                            }}
+                          />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black text-white border-none max-w-[300px]">
+                        <p>Seena's Inception Agent helps you set goals, scope & key questions.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
               {isEditing ? (
                 <>
                   <button
                     onClick={handleCancelEdit}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="btn-secondary"
                   >
                     Cancel
                   </button>
@@ -366,9 +403,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                   )}
                   <button
                     onClick={handleEditStudy}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="btn-secondary whitespace-nowrap"
                   >
-                    <Pencil className="h-4 w-4" />
                     Edit Details
                   </button>
                 </>
@@ -462,14 +498,70 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         {/* Interviews Table */}
         <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-gray-300 flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Interviews</h2>
-            <button 
-              className={`btn-primary ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!isStudySetupComplete(study)}
-              onClick={() => setShowAddInterviewDialog(true)}
-            >
-              Add Interview
-            </button>
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-semibold">Interviews</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {hasInterviewGuide ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="btn-primary"
+                        onClick={() => router.push(`/studies/${id}/interview-setup`)}
+                      >
+                        Interview Questions
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-black text-white border-none max-w-[300px]">
+                      <p>View and edit your interview questions</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <button
+                  className={`w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ 
+                    '--offset': '1px',
+                    boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                  } as React.CSSProperties}
+                  onClick={() => isStudySetupComplete(study) && router.push(`/studies/${id}/interview-setup`)}
+                  disabled={!isStudySetupComplete(study)}
+                >
+                  <span className="relative z-20 flex items-center gap-2">
+                    <Image
+                      src="/liquidBlack.svg"
+                      alt="Seena Logo"
+                      width={16}
+                      height={16}
+                      className="opacity-90"
+                    />
+                    <span className="text-black text-sm">2. Interview builder</span>
+                  </span>
+                  <div 
+                    className="absolute top-1/2 left-1/2 animate-spin-slow"
+                    style={{
+                      background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
+                      aspectRatio: '1',
+                      width: '100%',
+                    }}
+                  />
+                  <div 
+                    className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
+                    style={{
+                      boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
+                    }}
+                  />
+                </button>
+              )}
+              <button 
+                className={`btn-secondary ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!isStudySetupComplete(study)}
+                onClick={() => setShowAddInterviewDialog(true)}
+              >
+                Import Interview
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             {loading ? (
@@ -556,6 +648,11 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
             )
           );
         }}
+      />
+
+      <SetupInterviewDialog 
+        open={setupInterviewOpen} 
+        onOpenChange={setSetupInterviewOpen} 
       />
     </div>
   );

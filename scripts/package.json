@@ -1,0 +1,10 @@
+{
+  "name": "supabase-migration-script",
+  "version": "1.0.0",
+  "description": "Script to run Supabase migrations",
+  "main": "run-migration.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "sonner": "^2.0.3"
+  }
+}

@@ -84,6 +84,37 @@ body {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-step-in {
+  animation: step-in 0.3s ease-out forwards;
+  opacity: 0;
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(10px);
@@ -149,9 +180,9 @@ label.sr-only {
 
 /* Button Styles */
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2 bg-[#222222] text-white hover:bg-[#000000] hover:text-[#ff5021] transition-colors duration-200 rounded-lg font-mono;
+  @apply inline-flex items-center justify-center px-4 py-2 bg-[#222222] text-white hover:bg-[#000000] hover:text-[#ff5021] transition-colors duration-200 rounded-full font-mono text-xs;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-white text-black border border-black rounded-md hover:bg-gray-100 transition-colors font-mono;
+  @apply px-6 py-2 bg-white text-black border border-black rounded-full hover:bg-gray-100 transition-colors font-mono text-xs;
 }

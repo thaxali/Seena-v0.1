@@ -16,7 +16,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 }) => {
   return (
     <button
-      className={`px-4 py-2 bg-[#222222] text-white rounded-md hover:bg-[#000000] hover:text-[#ff5021] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className="btn-primary"
       disabled={loading || props.disabled}
       {...props}
     >

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import PrimaryButton from '@/components/ui/PrimaryButton';
+import Image from 'next/image';
 
 interface StudyTypeOption {
   value: string;
@@ -720,7 +721,7 @@ export default function StudySetupPage() {
               >
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
               </button>
-              <h1 className="text-3xl font-bold text-gray-900">Set up {study.title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Set up {study?.title}</h1>
             </div>
           </div>
         </div>
@@ -788,10 +789,17 @@ export default function StudySetupPage() {
                 
                 {isTyping && (
                   <div className="text-black mr-auto max-w-[80%] text-sm">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 relative">
+                        <Image
+                          src="/loading.svg"
+                          alt="Typing"
+                          width={24}
+                          height={24}
+                          priority
+                        />
+                      </div>
+                      <span className="text-gray-600">Assistant is typing...</span>
                     </div>
                   </div>
                 )}
@@ -866,36 +874,36 @@ export default function StudySetupPage() {
                 <div className="space-y-6 overflow-y-auto pr-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-clip-padding hover:[&::-webkit-scrollbar-thumb]:bg-gray-400" style={{ maxHeight: 'calc(100vh - 20rem)', scrollbarWidth: 'thin', scrollbarColor: '#D1D5DB transparent' }}>
                   <div className={`p-4 rounded-md ${activeSection === 'description' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Description</h3>
-                    <p className={`${study.description ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                      {study.description || 'A one-line overview of what this study is about'}
+                    <p className={`${study?.description ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                      {study?.description || 'A one-line overview of what this study is about'}
                     </p>
                   </div>
                   
                   <div className={`p-4 rounded-md ${activeSection === 'objective' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Objective</h3>
-                    <p className={`${study.objective ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                      {study.objective || 'What you want to learn from this study'}
+                    <p className={`${study?.objective ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                      {study?.objective || 'What you want to learn from this study'}
                     </p>
                   </div>
                   
                   <div className={`p-4 rounded-md ${activeSection === 'study_type' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Study Type</h3>
-                    <p className={`${study.study_type ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                      {study.study_type || 'One of [Exploratory, Comparative, Attitudinal, Behavioral]'}
+                    <p className={`${study?.study_type ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                      {study?.study_type || 'One of [Exploratory, Comparative, Attitudinal, Behavioral]'}
                     </p>
                   </div>
                   
                   <div className={`p-4 rounded-md ${activeSection === 'target_audience' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Target Audience</h3>
-                    <p className={`${study.target_audience ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                      {study.target_audience || 'Who you want to talk to'}
+                    <p className={`${study?.target_audience ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                      {study?.target_audience || 'Who you want to talk to'}
                     </p>
                   </div>
                   
                   <div className={`p-4 rounded-md ${activeSection === 'research_questions' ? 'bg-orange-50 border border-orange-200' : ''}`}>
                     <h3 className="text-sm font-medium mb-2 text-black">Research Questions</h3>
-                    <p className={`${study.research_questions ? 'text-gray-900 whitespace-pre-wrap' : 'text-gray-400 italic'}`}>
-                      {study.research_questions || 'The list of questions to ask participants'}
+                    <p className={`${study?.research_questions ? 'text-gray-900 whitespace-pre-wrap' : 'text-gray-400 italic'}`}>
+                      {study?.research_questions || 'The list of questions to ask participants'}
                     </p>
                   </div>
                 </div>

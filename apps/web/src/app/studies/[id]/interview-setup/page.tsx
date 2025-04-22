@@ -956,31 +956,6 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
           <h1 className="text-3xl font-bold text-gray-900">{study?.title} - interview protocol</h1>
         </div>
 
-        {/* Action Cards */}
-        <div className="flex gap-4 mb-6">
-          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <Download className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-medium">Print Interview Protocol</h3>
-            </div>
-            <p className="text-xs text-gray-400">Get a printable version of your interview questions and notes</p>
-          </div>
-          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-medium">Launch Seena Note Taker</h3>
-            </div>
-            <p className="text-xs text-gray-400">Start taking notes during your interview with AI assistance</p>
-          </div>
-          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <Mic className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-medium">Set Up Seena Voice Agent</h3>
-            </div>
-            <p className="text-xs text-gray-400">Configure AI voice agent to conduct the interview</p>
-          </div>
-        </div>
-        
         <div className="bg-white rounded-lg border border-gray-300 p-6">
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-2">
@@ -994,12 +969,13 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setIsAddingQuestion(true)}
-                          className="w-auto py-2 px-4 rounded-md text-black font-medium relative overflow-hidden bg-white hover:bg-gray-50 transition-all duration-300 shadow-sm border border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="btn-primary"
                         >
                           <span className="relative z-20 flex items-center gap-2">
                             <Plus className="h-4 w-4" />
-                            <span className="text-black text-sm font-medium">Add a question</span>
+                            <span className="black text-sm font-medium">Add a question</span>
                           </span>
+                          
                         </button>
                       </TooltipTrigger>
                       <TooltipContent className="bg-black text-white border-none">
@@ -1030,6 +1006,20 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                             />
                             <span className="text-black text-sm font-medium">Generate questions</span>
                           </span>
+                          <div 
+                            className="absolute top-1/2 left-1/2 animate-spin-slow"
+                            style={{
+                              background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
+                              aspectRatio: '1',
+                              width: '100%',
+                            }}
+                          />
+                          <div 
+                            className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
+                            style={{
+                              boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
+                            }}
+                          />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent className="bg-black text-white border-none">
@@ -1216,7 +1206,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                   <h4 className="text-md font-medium">Sub-questions</h4>
                   <button
                     onClick={handleAddSubQuestion}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                      className="flex items-center gap-1 px-3 py-1 text-sm text-black hover:bg-gray-100 rounded-md transition-colors"
                   >
                     <Plus className="h-4 w-4" />
                     Add sub-question
@@ -1266,17 +1256,17 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                 </div>
               </div>
               
-              <div className="flex justify-end mt-6">
+              <div className="flex justify-end mt-6 gap-2">
                 <button
                   onClick={() => setIsAddingQuestion(false)}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md mr-2"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddQuestion}
                   disabled={!newQuestion.trim()}
-                  className="px-4 py-2 text-sm text-white bg-black hover:bg-gray-900 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary"
                 >
                   Add Question
                 </button>

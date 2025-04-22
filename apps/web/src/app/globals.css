@@ -180,9 +180,9 @@ label.sr-only {
 
 /* Button Styles */
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2 bg-[#222222] text-white hover:bg-[#000000] hover:text-[#ff5021] transition-colors duration-200 rounded-lg font-mono;
+  @apply inline-flex items-center justify-center px-4 py-2 bg-[#222222] text-white hover:bg-[#000000] hover:text-[#ff5021] transition-colors duration-200 rounded-full font-mono text-xs;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-white text-black border border-black rounded-md hover:bg-gray-100 transition-colors font-mono;
+  @apply px-6 py-2 bg-white text-black border border-black rounded-full hover:bg-gray-100 transition-colors font-mono text-xs;
 }

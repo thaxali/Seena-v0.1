@@ -276,7 +276,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
           <div className="flex items-center gap-4">
             <Tag
               variant={
-                study?.status === 'active' ? 'green' :
+                study?.status === 'in_progress' ? 'green' :
                 study?.status === 'completed' ? 'blue' :
                 'grey'
               }
@@ -291,14 +291,6 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         </div>
         <div className="relative">
           <div className="flex items-center gap-2">
-            <button 
-              className={`p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors ${debugMode ? 'bg-orange-100 border-orange-300' : ''}`}
-              onClick={() => setDebugMode(!debugMode)}
-              aria-label="Toggle debug mode"
-              title="Debug mode"
-            >
-              <Bug className="h-5 w-5 text-gray-600" />
-            </button>
             <button 
               className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-100 transition-colors"
               onClick={() => setShowDropdown(!showDropdown)}
@@ -336,48 +328,45 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         {/* Study Details */}
         <div className="bg-white rounded-lg border border-gray-300 p-6">
           <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-semibold text-black">Study Details</h2>
+            <h2 className="text-xl font-semibold text-black">Study Details</h2>
+            <div className="flex items-center gap-2">
               {study && !isStudySetupComplete(study) && !isEditing && (
                 <div className="flex items-center gap-2">
-                  <button
-                    className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
-                    style={{ 
-                      '--offset': '1px',
-                      boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                    } as React.CSSProperties}
-                    onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
-                  >
-                    <span className="relative z-20 flex items-center gap-2">
-                      <Image
-                        src="/liquidBlack.svg"
-                        alt="Seena Logo"
-                        width={16}
-                        height={16}
-                        className="opacity-90"
-                      />
-                      <span className="text-black text-sm">1. Study planner</span>
-                    </span>
-                    <div 
-                      className="absolute top-1/2 left-1/2 animate-spin-slow"
-                      style={{
-                        background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
-                        aspectRatio: '1',
-                        width: '100%',
-                      }}
-                    />
-                    <div 
-                      className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
-                      style={{
-                        boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
-                      }}
-                    />
-                  </button>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
-                          <HelpCircle className="h-4 w-4 text-gray-500" />
+                        <button
+                          className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
+                          style={{ 
+                            '--offset': '1px',
+                            boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                          } as React.CSSProperties}
+                          onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
+                        >
+                          <span className="relative z-20 flex items-center gap-2">
+                            <Image
+                              src="/liquidBlack.svg"
+                              alt="Seena Logo"
+                              width={16}
+                              height={16}
+                              className="opacity-90"
+                            />
+                            <span className="text-black text-sm">1. Study planner</span>
+                          </span>
+                          <div 
+                            className="absolute top-1/2 left-1/2 animate-spin-slow"
+                            style={{
+                              background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
+                              aspectRatio: '1',
+                              width: '100%',
+                            }}
+                          />
+                          <div 
+                            className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
+                            style={{
+                              boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
+                            }}
+                          />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent className="bg-black text-white border-none max-w-[300px]">
@@ -387,13 +376,11 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                   </TooltipProvider>
                 </div>
               )}
-            </div>
-            <div className="flex items-center gap-2">
               {isEditing ? (
                 <>
                   <button
                     onClick={handleCancelEdit}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="btn-secondary"
                   >
                     Cancel
                   </button>

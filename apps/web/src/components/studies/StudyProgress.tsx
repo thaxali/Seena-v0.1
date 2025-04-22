@@ -51,20 +51,32 @@ export default function StudyProgress({ study, hasInterviewGuide, interviewsCoun
 
   // Calculate current step and progress
   const getCurrentStep = () => {
-    if (!study.objective || !study.study_type || !study.target_audience || !study.research_questions) {
-      return 1;
+    // Check if study details are complete
+    const isStudyComplete = !!(
+      study.objective &&
+      study.study_type &&
+      study.target_audience &&
+      study.research_questions
+    );
+
+    if (!isStudyComplete) {
+      return 1; // Step 1: Study details incomplete
     }
+
+    if (isStudyComplete && !hasInterviewGuide) {
+      return 2; // Step 2: Study complete but no interview guide
+    }
+
     if (hasInterviewGuide) {
-      return 2;
+      return 3; // Step 3: Interview guide exists
     }
-    if (interviewsCount > 0) {
-      return 4;
-    }
-    return 3;
+
+    return 1; // Default to step 1
   };
 
   const currentStep = getCurrentStep();
-  const progress = ((currentStep - 1) / (steps.length - 1)) * 100;
+  // Calculate progress based on current step
+  const progress = currentStep === 1 ? 0 : (currentStep - 1) * 25;
 
   return (
     <div className={`bg-black ${isExpanded ? 'rounded-xl' : 'rounded-full'} ${isExpanded ? 'p-4' : 'px-8 pt-0 pb-3'} mb-8 min-w-[680px] transition-all duration-300`}>

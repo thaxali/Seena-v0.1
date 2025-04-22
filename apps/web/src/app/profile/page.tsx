@@ -42,6 +42,30 @@ const ROLE_DEFINITIONS = [
   }
 ];
 
+// Add avatar options
+const AVATAR_OPTIONS = [
+  { id: 'initial', label: 'Use Initial' },
+  { id: 'paint', label: 'Paint', src: '/avatars/paint.png' },
+  { id: 'felt-black', label: 'Felt Black', src: '/avatars/felt-black.png' },
+  { id: 'lemon', label: 'Lemon', src: '/avatars/lemon.png' },
+  { id: 'science-pink', label: 'Science Pink', src: '/avatars/science-pink.png' },
+  { id: 'tron', label: 'Tron', src: '/avatars/tron.png' },
+  { id: 'basketball', label: 'Basketball', src: '/avatars/basketball.png' },
+  { id: 'dust-white', label: 'Dust White', src: '/avatars/dust-white.png' },
+  { id: 'newyork', label: 'New York', src: '/avatars/newyork.png' },
+  { id: 'grass', label: 'Grass', src: '/avatars/grass.png' },
+  { id: 'liquid-black', label: 'Liquid Black', src: '/avatars/liquid-black.png' },
+  { id: 'water', label: 'Water', src: '/avatars/water.png' },
+  { id: 'liquid-white', label: 'Liquid White', src: '/avatars/liquid-white.png' },
+  { id: 'tennis', label: 'Tennis', src: '/avatars/tennis.png' },
+  { id: 'science-orange', label: 'Science Orange', src: '/avatars/science-orange.png' },
+  { id: 'wave-white', label: 'Wave White', src: '/avatars/wave-white.png' },
+  { id: 'gummybear', label: 'Gummy Bear', src: '/avatars/gummybear.png' },
+  { id: 'sun', label: 'Sun', src: '/avatars/sun.png' },
+  { id: 'cottoncandy', label: 'Cotton Candy', src: '/avatars/cottoncandy.png' },
+  { id: 'dust-silver', label: 'Dust Silver', src: '/avatars/dust-silver.png' },
+];
+
 export default function ProfilePage() {
   const { user } = useAuth();
   const { markTaskComplete } = useOnboardingTasks();
@@ -70,6 +94,8 @@ export default function ProfilePage() {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('ProfilePage useEffect triggered, user:', user);
@@ -275,48 +301,48 @@ export default function ProfilePage() {
     setEditingField(null);
   };
 
-  // Function to handle avatar upload
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
+  // Function to handle avatar selection
+  const handleAvatarSelect = async (avatarId: string) => {
     try {
       setUpdating(true);
+      let avatarUrl = '';
       
-      // Upload the file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
-      
-      if (uploadError) throw uploadError;
-      
-      // Get the public URL
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      if (avatarId === 'initial') {
+        // Use initial as avatar
+        avatarUrl = '';
+      } else {
+        // Use selected avatar image
+        avatarUrl = AVATAR_OPTIONS.find(opt => opt.id === avatarId)?.src || '';
+      }
       
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: data.publicUrl })
-        .eq('id', user.id);
+        .update({ avatar_url: avatarUrl })
+        .eq('id', user?.id);
       
       if (updateError) throw updateError;
       
       // Update local state
-      setProfile({ ...profile, avatar_url: data.publicUrl });
+      setProfile({ ...profile, avatar_url: avatarUrl });
+      setSelectedAvatar(avatarId);
+      setShowAvatarPicker(false);
       setMessage({ type: 'success', text: 'Avatar updated successfully!' });
     } catch (error) {
-      console.error('Error uploading avatar:', error);
-      setMessage({ type: 'error', text: 'Error uploading avatar' });
+      console.error('Error updating avatar:', error);
+      setMessage({ type: 'error', text: 'Error updating avatar' });
     } finally {
       setUpdating(false);
     }
   };
+
+  // Update avatar when name changes
+  useEffect(() => {
+    if (profile.avatar_url === '' && user?.user_metadata?.display_name) {
+      // If using initial avatar and name changes, update the display
+      setProfile(prev => ({ ...prev }));
+    }
+  }, [user?.user_metadata?.display_name]);
 
   // Function to trigger file input click
   const triggerFileInput = () => {
@@ -538,12 +564,12 @@ export default function ProfilePage() {
           <h2 className="text-xl font-semibold mb-6">Account Details</h2>
           
           <div className="flex items-start gap-6">
-            {/* Avatar Section - Hidden for now */}
-            <div className="hidden">
+            {/* Avatar Section */}
+            <div>
               <div className="flex flex-col items-center">
                 <div 
-                  className="w-24 h-24 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-medium relative cursor-pointer"
-                  onClick={triggerFileInput}
+                  className="w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-medium relative cursor-pointer"
+                  onClick={() => setShowAvatarPicker(true)}
                 >
                   {profile.avatar_url ? (
                     <img 
@@ -552,25 +578,12 @@ export default function ProfilePage() {
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    user?.email?.[0].toUpperCase() || 'U'
+                    user?.user_metadata?.display_name?.[0].toUpperCase() || user?.email?.[0].toUpperCase() || 'U'
                   )}
                   <div className="absolute inset-0 bg-black bg-opacity-40 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                     <Edit2 className="h-6 w-6 text-white" />
                   </div>
                 </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleAvatarUpload} 
-                  accept="image/*" 
-                  className="hidden" 
-                />
-                <button 
-                  onClick={triggerFileInput}
-                  className="mt-2 text-sm text-orange-500 hover:text-orange-600"
-                >
-                  Change Avatar
-                </button>
               </div>
             </div>
             
@@ -804,6 +817,50 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Avatar Picker Modal */}
+        {showAvatarPicker && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">Choose Avatar</h3>
+                <button
+                  onClick={() => setShowAvatarPicker(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4">
+                {AVATAR_OPTIONS.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    onClick={() => handleAvatarSelect(avatar.id)}
+                    className={`p-2 rounded-lg border-2 transition-all ${
+                      selectedAvatar === avatar.id
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-gray-200 hover:border-orange-200'
+                    }`}
+                  >
+                    {avatar.id === 'initial' ? (
+                      <div className="w-full aspect-square rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-medium">
+                        {user?.user_metadata?.display_name?.[0].toUpperCase() || user?.email?.[0].toUpperCase() || 'U'}
+                      </div>
+                    ) : (
+                      <img
+                        src={avatar.src}
+                        alt={avatar.label}
+                        className="w-full aspect-square rounded-full object-cover"
+                      />
+                    )}
+                    <p className="text-sm text-center mt-2 text-gray-600">{avatar.label}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

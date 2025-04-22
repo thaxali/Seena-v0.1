@@ -256,7 +256,7 @@ export async function POST(req: Request) {
         6. Thank You & Wrap-Up
           - Thank you for your time. Have a great day.
 ",
-  "duration_minutes": roughly estimate the duration of the interview in minutes assuming each question takes 1-3 minute to answer,
+  "duration_minutes": roughly estimate the duration of the interview in minutes assuming each question including subquestions takes 1-3 minute to answer,
   }
 }`
       };

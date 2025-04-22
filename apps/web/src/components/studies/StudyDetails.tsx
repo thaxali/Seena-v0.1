@@ -16,6 +16,7 @@ import { Tag } from "@/components/ui/tag";
 import SetupInterviewDialog from './SetupInterviewDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Image from "next/image";
+import StudyProgress from './StudyProgress';
 
 interface StudyDetailsProps {
   id: string;
@@ -325,6 +326,13 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
       {/* Main content */}
       <div className="space-y-8">
+        {/* Study Progress */}
+        <StudyProgress 
+          study={study}
+          hasInterviewGuide={hasInterviewGuide}
+          interviewsCount={interviews.length}
+        />
+
         {/* Study Details */}
         <div className="bg-white rounded-lg border border-gray-300 p-6">
           <div className="flex justify-between items-center mb-6">

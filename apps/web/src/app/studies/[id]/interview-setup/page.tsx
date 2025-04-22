@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
-import { ChevronLeft, Bug, HelpCircle, Pencil, Check, X, Loader2, Plus, Trash2, Download, Mic, FileText } from 'lucide-react';
+import { ChevronLeft, Bug, HelpCircle, Pencil, Check, X, Loader2, Plus, Trash2, Download, Mic, FileText, FileQuestion } from 'lucide-react';
 import Image from 'next/image';
 import MainLayout from '@/components/layout/MainLayout';
 import PrimaryButton from '@/components/ui/PrimaryButton';
@@ -33,7 +33,16 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   const [isGenerating, setIsGenerating] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [interviewGuide, setInterviewGuide] = useState<{
-    questions: string[];
+    questions: Array<{
+      id: string;
+      question: string;
+      notes: string;
+      sub_questions: Array<{
+        id: string;
+        question: string;
+        notes: string;
+      }>;
+    }>;
     instructions: string;
     system_prompt: string;
     duration_minutes: number;
@@ -275,7 +284,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       
       // Update the interview guide state with the new data
       setInterviewGuide({
-        questions: formattedQuestions as any[],
+        questions: formattedQuestions,
         instructions: guideData.instructions || '',
         system_prompt: guideData.system_prompt || '',
         duration_minutes: guideData.duration_minutes || 60
@@ -289,9 +298,6 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         description: "Interview guide has been regenerated successfully.",
         variant: "default"
       });
-      
-      // Only hide loading messages after everything is complete
-      setShowLoadingMessages(false);
 
     } catch (error) {
       console.error('Error generating interview guide:', error);
@@ -300,10 +306,13 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         description: "Failed to generate interview guide. Please try again.",
         variant: "destructive"
       });
-      // Hide loading messages on error
-      setShowLoadingMessages(false);
     } finally {
-      setIsGenerating(false);
+      // Only hide loading messages and generating state after a short delay
+      // This ensures the last loading message is visible
+      setTimeout(() => {
+        setShowLoadingMessages(false);
+        setIsGenerating(false);
+      }, 1000);
     }
   };
 
@@ -337,8 +346,15 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         console.error('Error fetching existing interview guide:', fetchError);
       }
       
-      // Prepare the data to save
-      const guideData = {
+      // Prepare the data to save with proper typing
+      const guideData: {
+        study_id: string;
+        questions: any[];
+        instructions: string;
+        system_prompt: string;
+        duration_minutes: number;
+        id?: string;
+      } = {
         study_id: study.id,
         questions: interviewGuide.questions,
         instructions: interviewGuide.instructions,
@@ -348,7 +364,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       
       // If an existing guide was found, include its ID for the update
       if (existingGuide) {
-        guideData['id'] = existingGuide.id;
+        guideData.id = existingGuide.id;
       }
       
       console.log('Upserting interview guide with data:', guideData);
@@ -416,7 +432,16 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   };
 
   // Helper function to format interview guide questions for display
-  const formatInterviewGuideQuestions = (questions: any[]) => {
+  const formatInterviewGuideQuestions = (questions: any[]): Array<{
+    id: string;
+    question: string;
+    notes: string;
+    sub_questions: Array<{
+      id: string;
+      question: string;
+      notes: string;
+    }>;
+  }> => {
     if (!questions || !Array.isArray(questions)) {
       console.error('Invalid questions format:', questions);
       return [];
@@ -429,7 +454,11 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
           id: q.id || `q${index + 1}`,
           question: q.question,
           notes: q.notes || '',
-          sub_questions: q.sub_questions || []
+          sub_questions: Array.isArray(q.sub_questions) ? q.sub_questions.map((sq: any, sqIndex: number) => ({
+            id: sq.id || `sq${index + 1}_${sqIndex + 1}`,
+            question: sq.question || '',
+            notes: sq.notes || ''
+          })) : []
         };
       }
       
@@ -448,7 +477,11 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         id: q.id || `q${index + 1}`,
         question: q.question || q.text || JSON.stringify(q),
         notes: q.notes || '',
-        sub_questions: q.sub_questions || []
+        sub_questions: Array.isArray(q.sub_questions) ? q.sub_questions.map((sq: any, sqIndex: number) => ({
+          id: sq.id || `sq${index + 1}_${sqIndex + 1}`,
+          question: sq.question || '',
+          notes: sq.notes || ''
+        })) : []
       };
     });
   };
@@ -961,11 +994,11 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setIsAddingQuestion(true)}
-                          className="w-auto py-2 px-4 rounded-md text-white font-medium relative overflow-hidden bg-black hover:bg-gray-900 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-auto py-2 px-4 rounded-md text-black font-medium relative overflow-hidden bg-white hover:bg-gray-50 transition-all duration-300 shadow-sm border border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span className="relative z-20 flex items-center gap-2">
                             <Plus className="h-4 w-4" />
-                            <span className="text-white text-sm font-medium">Add a question</span>
+                            <span className="text-black text-sm font-medium">Add a question</span>
                           </span>
                         </button>
                       </TooltipTrigger>
@@ -995,7 +1028,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                               height={16}
                               className="opacity-90"
                             />
-                            <span className="text-black text-sm font-medium">Re-generate questions</span>
+                            <span className="text-black text-sm font-medium">Generate questions</span>
                           </span>
                         </button>
                       </TooltipTrigger>
@@ -1061,20 +1094,13 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                       )}
                     </div>
                   ) : (
-                    <textarea
-                      className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                      rows={10}
-                      placeholder="Interview questions will appear here after generation"
-                      value={formatInterviewGuideQuestions(interviewGuide?.questions || [])}
-                      onChange={(e) => {
-                        if (interviewGuide) {
-                          setInterviewGuide({
-                            ...interviewGuide,
-                            questions: e.target.value.split('\n').map(q => q.trim())
-                          });
-                        }
-                      }}
-                    />
+                    <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                      <FileQuestion className="h-12 w-12 text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Interview Questions Yet</h3>
+                      <p className="text-sm text-gray-500 text-center max-w-md">
+                        Your interview questions will appear here after generation. Use the "Re-generate questions" button above to create your first set of questions.
+                      </p>
+                    </div>
                   )}
                 </div>
 

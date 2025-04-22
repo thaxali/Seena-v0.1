@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
-import { ChevronLeft, Bug, HelpCircle } from 'lucide-react';
+import { ChevronLeft, Bug, HelpCircle, Pencil, Check, X, Loader2, Plus, Trash2, Download, Mic, FileText } from 'lucide-react';
 import Image from 'next/image';
 import MainLayout from '@/components/layout/MainLayout';
 import PrimaryButton from '@/components/ui/PrimaryButton';
@@ -30,9 +30,28 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   const [debugMode, setDebugMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [interviewGuide, setInterviewGuide] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [interviewGuide, setInterviewGuide] = useState<{
+    questions: string[];
+    instructions: string;
+    system_prompt: string;
+    duration_minutes: number;
+  } | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [showLoadingMessages, setShowLoadingMessages] = useState(false);
+  const [isAddingQuestion, setIsAddingQuestion] = useState(false);
+  const [newQuestion, setNewQuestion] = useState('');
+  const [newQuestionNotes, setNewQuestionNotes] = useState('');
+  const [newSubQuestions, setNewSubQuestions] = useState<{ id: string; question: string; notes: string }[]>([]);
+  const [newSubQuestion, setNewSubQuestion] = useState('');
+  const [newSubQuestionNotes, setNewSubQuestionNotes] = useState('');
+  const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
+  const [editedQuestion, setEditedQuestion] = useState<any>(null);
+  const [editingSubQuestion, setEditingSubQuestion] = useState<string | null>(null);
+  const [editedSubQuestion, setEditedSubQuestion] = useState<any>(null);
+  const [newSubQuestionForEdit, setNewSubQuestionForEdit] = useState('');
+  const [newSubQuestionNotesForEdit, setNewSubQuestionNotesForEdit] = useState('');
   
   // Loading messages to display while waiting for GPT response
   const loadingMessages = [
@@ -146,7 +165,12 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
           
         if (!guideError && guideData) {
           console.log('Interview guide found:', guideData);
-          setInterviewGuide(guideData);
+          setInterviewGuide({
+            questions: guideData.questions || [],
+            instructions: guideData.instructions || '',
+            system_prompt: guideData.system_prompt || '',
+            duration_minutes: guideData.duration_minutes || 60
+          });
           
           // Format the interview guide questions for display
           const formattedQuestions = formatInterviewGuideQuestions(guideData.questions);
@@ -172,440 +196,717 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   }, [params.id]);
 
   const generateInterviewGuide = async () => {
-    if (!study) {
-      setError('Study not found');
-      return;
-    }
-
-    if (!study.id) {
-      setError('Invalid study ID');
-      return;
-    }
-
     try {
-      setLoading(true);
-      setError(null);
-      setIsLoading(true);
+      setIsGenerating(true);
       setShowLoadingMessages(true);
       setLoadingMessageIndex(0);
-
-      // Get user details
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error('User not authenticated');
-
-      // Verify study exists and belongs to user
-      const { data: studyData, error: studyError } = await supabase
-        .from('studies')
-        .select('*')
-        .eq('id', study.id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (studyError) throw studyError;
-      if (!studyData) throw new Error('Study not found or you do not have permission to update it');
-
-      // Generate interview guide using GPT
+      
+      // Format research questions properly
+      let formattedResearchQuestions = '';
+      if (study?.research_questions) {
+        if (Array.isArray(study.research_questions)) {
+          formattedResearchQuestions = study.research_questions
+            .map((q: any) => {
+              // If q is an object with a question property, use that
+              if (typeof q === 'object' && q.question) {
+                return q.question;
+              }
+              // If q is a string, use it directly
+              if (typeof q === 'string') {
+                return q;
+              }
+              // Otherwise, try to convert to string
+              return JSON.stringify(q);
+            })
+            .join(', ');
+        } else if (typeof study.research_questions === 'string') {
+          formattedResearchQuestions = study.research_questions;
+        } else {
+          formattedResearchQuestions = JSON.stringify(study.research_questions);
+        }
+      }
+      
+      console.log('Formatted research questions:', formattedResearchQuestions);
+      
       const response = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          payload: {
-            action: 'generate_interview_guide'
-          },
-          study: studyData,
-          user: user,
           messages: [
             {
               role: 'user',
-              content: JSON.stringify({
-                message: `Generate an interview guide for a ${studyData.study_type} study. 
-                The study's research questions are:
-                ${studyData.research_questions || 'No research questions provided'}
-
-                Based on these research questions, generate:
-                1. A structured set of interview questions that will help gather information to answer them
-                2. Instructions for conducting the interview
-                3. A system prompt for the interviewer
-                4. Estimated duration in minutes
-                5. Any supplementary materials needed
-
-                The interview questions should be:
-                1. Open-ended
-                2. Focused on gathering user insights and experiences
-                3. Designed to help answer the research questions above
-                4. Suitable for a ${studyData.study_type} study with ${studyData.target_audience || 'the target audience'}
-
-                Please format the response as a JSON object with:
-                {
-                  "questions": [
-                    {
-                      "id": "unique_id",
-                      "question": "main question",
-                      "sub_questions": [
-                        {
-                          "id": "unique_id",
-                          "question": "follow-up question",
-                          "notes": "optional notes for the interviewer"
-                        }
-                      ],
-                      "notes": "optional notes for the interviewer"
-                    }
-                  ],
-                  "instructions": "detailed instructions for conducting the interview",
-                  "system_prompt": "prompt for the interviewer",
-                  "duration_minutes": number,
-                  "supplementary_materials": { "material1": "description", ... }
-                }`
-              })
+              content: `Generate an interview guide for a ${study?.study_type} study with the following research questions: ${formattedResearchQuestions}`
             }
-          ]
+          ],
+          study: study,
+          user: user,
+          payload: {
+            action: 'generate_interview_guide'
+          }
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate interview guide');
+        throw new Error('Failed to generate interview guide');
       }
 
       const data = await response.json();
-      console.log('GPT Response:', data);
+      console.log('Raw GPT response:', data);
 
-      // Parse the interview guide
-      const interviewGuide = data.content;
-      console.log('Raw Interview Guide:', interviewGuide);
-      console.log('Interview Guide Type:', typeof interviewGuide);
+      // Check if the response has the expected structure
+      if (!data || !data.content) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid interview guide format received');
+      }
+
+      // Process the guide data from the content property
+      const guideData = data.content;
       
-      // Extract the guide data
-      let guideData = {
-        questions: [] as Array<{
-          id: string;
-          question: string;
-          sub_questions: Array<{
-            id: string;
-            question: string;
-            notes?: string;
-          }>;
-          notes?: string;
-        }>,
-        instructions: '',
-        system_prompt: '',
-        duration_minutes: 60,
-        supplementary_materials: {}
-      };
-
-      // The response should now be a direct JSON object
-      if (typeof interviewGuide === 'object' && interviewGuide !== null) {
-        console.log('Processing interview guide as object');
-        console.log('Interview guide keys:', Object.keys(interviewGuide));
-        
-        guideData = {
-          questions: Array.isArray(interviewGuide.questions) ? interviewGuide.questions : [],
-          instructions: interviewGuide.instructions || '',
-          system_prompt: interviewGuide.system_prompt || '',
-          duration_minutes: interviewGuide.duration_minutes || 60,
-          supplementary_materials: interviewGuide.supplementary_materials || {}
-        };
-        
-        console.log('Processed guide data:', guideData);
-      } else {
-        console.error('Invalid interview guide format:', interviewGuide);
-        throw new Error('Invalid interview guide format received from API');
+      // Ensure questions is an array
+      if (!Array.isArray(guideData.questions)) {
+        console.error('Questions is not an array:', guideData.questions);
+        throw new Error('Interview guide questions must be an array');
       }
-
-      // Save to interview_guides table
-      console.log('Saving to interview_guides:', {
-        study_id: study.id,
-        questions: guideData.questions,
-        instructions: guideData.instructions,
-        system_prompt: guideData.system_prompt,
-        duration_minutes: guideData.duration_minutes,
-        supplementary_materials: guideData.supplementary_materials
+      
+      // Format the questions with IDs
+      const formattedQuestions = formatInterviewGuideQuestions(guideData.questions);
+      
+      // Update the interview guide state with the new data
+      setInterviewGuide({
+        questions: formattedQuestions as any[],
+        instructions: guideData.instructions || '',
+        system_prompt: guideData.system_prompt || '',
+        duration_minutes: guideData.duration_minutes || 60
       });
 
-      const { error: insertError } = await supabase
-        .from('interview_guides')
-        .insert({
-          study_id: study.id,
-          questions: guideData.questions,
-          instructions: guideData.instructions,
-          system_prompt: guideData.system_prompt,
-          duration_minutes: guideData.duration_minutes,
-          supplementary_materials: guideData.supplementary_materials
-        });
-
-      if (insertError) {
-        console.error('Failed to save interview guide:', insertError);
-        throw new Error(`Failed to save interview guide: ${insertError.message}`);
-      }
-
-      // After successfully saving to the database, fetch the latest interview guide
-      const { data: guideDataAfterInsert, error: guideErrorAfterInsert } = await supabase
-        .from('interview_guides')
-        .select('*')
-        .eq('study_id', study.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-        
-      if (!guideErrorAfterInsert && guideDataAfterInsert) {
-        console.log('Interview guide fetched after generation:', guideDataAfterInsert);
-        setInterviewGuide(guideDataAfterInsert);
-      }
-
-      // Format questions for display in textarea
-      const formattedQuestions = guideData.questions.map(q => {
-        let text = q.question;
-        if (q.notes) {
-          text += `\nNotes: ${q.notes}`;
-        }
-        if (q.sub_questions.length > 0) {
-          text += '\nSub-questions:';
-          q.sub_questions.forEach(sq => {
-            text += `\n- ${sq.question}`;
-            if (sq.notes) {
-              text += `\n  Notes: ${sq.notes}`;
-            }
-          });
-        }
-        return text;
-      }).join('\n\n');
-
-      // Update local state with the formatted questions
-      setStudy((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          interview_questions: formattedQuestions
-        };
-      });
+      // Save to database
+      await updateInterviewGuide();
 
       toast({
         title: "Success",
-        description: "Interview guide generated and saved successfully",
+        description: "Interview guide has been regenerated successfully.",
+        variant: "default"
       });
-
-      // Set loading states to false to trigger the dismissal animation
-      setIsLoading(false);
       
-      // The useEffect will handle cycling through messages and dismissing the loading indicator
+      // Only hide loading messages after everything is complete
+      setShowLoadingMessages(false);
 
-      return formattedQuestions;
-    } catch (err) {
-      console.error('Error in generateInterviewGuide:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (error) {
+      console.error('Error generating interview guide:', error);
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : 'An error occurred',
-        variant: "destructive",
+        description: "Failed to generate interview guide. Please try again.",
+        variant: "destructive"
       });
-      // Make sure to set loading states to false even on error
-      setIsLoading(false);
+      // Hide loading messages on error
       setShowLoadingMessages(false);
-      throw err;
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
-  const updateInterviewQuestions = async () => {
-    if (!study || !interviewGuide) return;
-    
+  const updateInterviewGuide = async () => {
+    if (!interviewGuide || !study?.id) {
+      console.error('Cannot update interview guide: missing data', { 
+        hasInterviewGuide: !!interviewGuide, 
+        studyId: study?.id 
+      });
+      return;
+    }
+
     try {
       setIsUpdating(true);
+      console.log('Saving interview guide to database:', {
+        study_id: study.id,
+        questions: interviewGuide.questions,
+        instructions: interviewGuide.instructions,
+        system_prompt: interviewGuide.system_prompt,
+        duration_minutes: interviewGuide.duration_minutes
+      });
       
-      // Parse the textarea content to update the interview guide
-      const updatedQuestions = parseTextareaToQuestions(study.research_questions);
-      
-      // Update the interview guide in the database
-      const { error } = await supabase
+      // First check if an interview guide already exists for this study
+      const { data: existingGuide, error: fetchError } = await supabase
         .from('interview_guides')
-        .update({
-          questions: updatedQuestions,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', interviewGuide.id);
+        .select('id')
+        .eq('study_id', study.id)
+        .single();
+        
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching existing interview guide:', fetchError);
+      }
       
+      // Prepare the data to save
+      const guideData = {
+        study_id: study.id,
+        questions: interviewGuide.questions,
+        instructions: interviewGuide.instructions,
+        system_prompt: interviewGuide.system_prompt,
+        duration_minutes: interviewGuide.duration_minutes
+      };
+      
+      // If an existing guide was found, include its ID for the update
+      if (existingGuide) {
+        guideData['id'] = existingGuide.id;
+      }
+      
+      console.log('Upserting interview guide with data:', guideData);
+      
+      // Perform the upsert operation
+      const { data, error } = await supabase
+        .from('interview_guides')
+        .upsert(guideData)
+        .select();
+
       if (error) {
+        console.error('Supabase error:', error);
         throw error;
       }
       
-      // Update the local state with the new questions
-      setInterviewGuide({
-        ...interviewGuide,
-        questions: updatedQuestions
-      });
+      console.log('Interview guide saved successfully:', data);
       
       toast({
         title: "Success",
-        description: "Interview questions updated successfully.",
+        description: "Interview guide updated successfully",
+        variant: "default"
       });
-    } catch (err) {
-      console.error('Error updating interview questions:', err);
+    } catch (error) {
+      console.error('Error updating interview guide:', error);
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to update interview questions',
-        variant: "destructive",
+        description: "Failed to update interview guide",
+        variant: "destructive"
       });
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Helper function to parse the textarea content back into the questions structure
-  const parseTextareaToQuestions = (textareaContent: string) => {
-    try {
-      const lines = textareaContent.split('\n');
-      const questions: any[] = [];
-      let currentQuestion: any = null;
-      let currentSubQuestions: any[] = [];
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        
-        // Skip empty lines
-        if (!line) continue;
-        
-        // Check if this is a main question (starts with a number)
-        const mainQuestionMatch = line.match(/^(\d+)\.\s+(.+)$/);
-        if (mainQuestionMatch) {
-          // If we have a previous question, save it
-          if (currentQuestion) {
-            if (currentSubQuestions.length > 0) {
-              currentQuestion.sub_questions = currentSubQuestions;
-            }
-            questions.push(currentQuestion);
-          }
-          
-          // Start a new question
-          currentQuestion = {
-            id: `q_${mainQuestionMatch[1]}`,
-            question: mainQuestionMatch[2],
-            sub_questions: []
-          };
-          currentSubQuestions = [];
-          continue;
-        }
-        
-        // Check if this is a note for the main question
-        const noteMatch = line.match(/^\s*Notes:\s+(.+)$/);
-        if (noteMatch && currentQuestion) {
-          currentQuestion.notes = noteMatch[1];
-          continue;
-        }
-        
-        // Check if this is a sub-question (starts with a letter)
-        const subQuestionMatch = line.match(/^\s*([a-z])\.\s+(.+)$/);
-        if (subQuestionMatch && currentQuestion) {
-          const subQuestion = {
-            id: `sq_${currentQuestion.id}_${subQuestionMatch[1]}`,
-            question: subQuestionMatch[2]
-          };
-          currentSubQuestions.push(subQuestion);
-          continue;
-        }
-        
-        // Check if this is a note for a sub-question
-        const subNoteMatch = line.match(/^\s*Notes:\s+(.+)$/);
-        if (subNoteMatch && currentSubQuestions.length > 0) {
-          currentSubQuestions[currentSubQuestions.length - 1].notes = subNoteMatch[1];
-          continue;
-        }
-      }
-      
-      // Add the last question if there is one
-      if (currentQuestion) {
-        if (currentSubQuestions.length > 0) {
-          currentQuestion.sub_questions = currentSubQuestions;
-        }
-        questions.push(currentQuestion);
-      }
-      
-      return questions;
-    } catch (e) {
-      console.error('Error parsing textarea content:', e);
-      // Return the original questions if parsing fails
-      return interviewGuide.questions;
-    }
-  };
+  const fetchStudyDetails = async () => {
+    if (!study?.id) return;
 
-  // Format interview questions for display
-  const formatInterviewQuestions = () => {
-    // If we have user edits in the study.research_questions, use that
-    if (study?.research_questions && study.research_questions !== '') {
-      return study.research_questions;
-    }
-    
-    // If we have an interview guide, format its questions
-    if (interviewGuide && interviewGuide.questions) {
-      try {
-        const questions = interviewGuide.questions;
-        let formattedText = '';
-        
-        questions.forEach((q: any, index: number) => {
-          formattedText += `${index + 1}. ${q.question}\n`;
-          
-          if (q.notes) {
-            formattedText += `   Notes: ${q.notes}\n`;
-          }
-          
-          if (q.sub_questions && q.sub_questions.length > 0) {
-            q.sub_questions.forEach((sq: any, sqIndex: number) => {
-              formattedText += `   ${String.fromCharCode(97 + sqIndex)}. ${sq.question}\n`;
-              if (sq.notes) {
-                formattedText += `      Notes: ${sq.notes}\n`;
-              }
-            });
-          }
-          
-          formattedText += '\n';
-        });
-        
-        return formattedText;
-      } catch (e) {
-        console.error('Error formatting interview questions:', e);
+    try {
+      const { data: guideData, error } = await supabase
+        .from('interview_guides')
+        .select('*')
+        .eq('study_id', study.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
       }
+
+      if (guideData) {
+        setInterviewGuide({
+          questions: guideData.questions || [],
+          instructions: guideData.instructions || '',
+          system_prompt: guideData.system_prompt || '',
+          duration_minutes: guideData.duration_minutes || 60
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching interview guide:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch interview guide",
+        variant: "destructive"
+      });
     }
-    
-    // If we have no interview guide and no user edits, return empty string
-    return '';
   };
 
   // Helper function to format interview guide questions for display
   const formatInterviewGuideQuestions = (questions: any[]) => {
     if (!questions || !Array.isArray(questions)) {
-      return '';
+      console.error('Invalid questions format:', questions);
+      return [];
     }
     
-    try {
-      let formattedText = '';
+    return questions.map((q, index) => {
+      // If q is already an object with the expected structure, return it with an ID
+      if (typeof q === 'object' && q.question) {
+        return {
+          id: q.id || `q${index + 1}`,
+          question: q.question,
+          notes: q.notes || '',
+          sub_questions: q.sub_questions || []
+        };
+      }
       
-      questions.forEach((q: any, index: number) => {
-        formattedText += `${index + 1}. ${q.question}\n`;
-        
-        if (q.notes) {
-          formattedText += `   Notes: ${q.notes}\n`;
-        }
-        
-        if (q.sub_questions && q.sub_questions.length > 0) {
-          q.sub_questions.forEach((sq: any, sqIndex: number) => {
-            formattedText += `   ${String.fromCharCode(97 + sqIndex)}. ${sq.question}\n`;
-            if (sq.notes) {
-              formattedText += `      Notes: ${sq.notes}\n`;
-            }
-          });
-        }
-        
-        formattedText += '\n';
-      });
+      // If q is a string, convert it to the expected object structure
+      if (typeof q === 'string') {
+        return {
+          id: `q${index + 1}`,
+          question: q,
+          notes: '',
+          sub_questions: []
+        };
+      }
       
-      return formattedText;
-    } catch (e) {
-      console.error('Error formatting interview guide questions:', e);
-      return '';
+      // If q is an object but doesn't have the expected structure, try to extract what we can
+      return {
+        id: q.id || `q${index + 1}`,
+        question: q.question || q.text || JSON.stringify(q),
+        notes: q.notes || '',
+        sub_questions: q.sub_questions || []
+      };
+    });
+  };
+
+  // Function to handle editing a question
+  const handleEditQuestion = (questionId: string) => {
+    if (!interviewGuide?.questions) return;
+    
+    const question = interviewGuide.questions.find((q: any) => q.id === questionId);
+    if (question) {
+      setEditingQuestion(questionId);
+      // Create a new object with the same properties
+      setEditedQuestion(Object.assign({}, question));
     }
+  };
+
+  // Function to handle editing a sub-question
+  const handleEditSubQuestion = (questionId: string, subQuestionId: string) => {
+    if (!interviewGuide?.questions) return;
+    
+    const question = interviewGuide.questions.find((q: any) => q.id === questionId);
+    if (question && question.sub_questions) {
+      const subQuestion = question.sub_questions.find((sq: any) => sq.id === subQuestionId);
+      if (subQuestion) {
+        setEditingSubQuestion(subQuestionId);
+        setEditedSubQuestion(Object.assign({}, subQuestion));
+      }
+    }
+  };
+
+  // Function to save edited question
+  const handleSaveQuestion = () => {
+    if (!editingQuestion || !editedQuestion || !interviewGuide?.questions) return;
+    
+    const updatedQuestions = interviewGuide.questions.map((q: any) => 
+      q.id === editingQuestion ? editedQuestion : q
+    );
+    
+    setInterviewGuide({
+      ...interviewGuide,
+      questions: updatedQuestions
+    });
+    
+    setEditingQuestion(null);
+    setEditedQuestion(null);
+  };
+
+  // Function to save edited sub-question
+  const handleSaveSubQuestion = () => {
+    if (!editingSubQuestion || !editedSubQuestion || !interviewGuide?.questions) return;
+    
+    const updatedQuestions = interviewGuide.questions.map((q: any) => {
+      if (q.sub_questions) {
+        const updatedSubQuestions = (q.sub_questions as any[]).map((sq: any) => 
+          sq.id === editingSubQuestion ? editedSubQuestion : sq
+        );
+        return { ...q, sub_questions: updatedSubQuestions };
+      }
+      return q;
+    });
+    
+    setInterviewGuide({
+      ...interviewGuide,
+      questions: updatedQuestions
+    });
+    
+    setEditingSubQuestion(null);
+    setEditedSubQuestion(null);
+  };
+
+  // Function to cancel editing
+  const handleCancelEdit = () => {
+    setEditingQuestion(null);
+    setEditedQuestion(null);
+  };
+
+  // Function to cancel editing sub-question
+  const handleCancelSubQuestionEdit = () => {
+    setEditingSubQuestion(null);
+    setEditedSubQuestion(null);
+  };
+
+  // Function to handle deleting a question
+  const handleDeleteQuestion = (questionId: string) => {
+    if (!interviewGuide?.questions) return;
+    
+    // Filter out the question to delete
+    const updatedQuestions = interviewGuide.questions.filter((q: any) => q.id !== questionId);
+    
+    // Update the interview guide state
+    setInterviewGuide({
+      ...interviewGuide,
+      questions: updatedQuestions
+    });
+    
+    // Reset editing state
+    setEditingQuestion(null);
+    setEditedQuestion(null);
+    
+    // Save to database
+    updateInterviewGuide();
+    
+    toast({
+      title: "Success",
+      description: "Question deleted successfully",
+      variant: "default"
+    });
+  };
+
+  // Function to handle deleting a sub-question
+  const handleDeleteSubQuestion = (questionId: string, subQuestionId: string) => {
+    if (!interviewGuide?.questions) return;
+    
+    // Find the parent question
+    const parentQuestion = interviewGuide.questions.find((q: any) => q.id === questionId);
+    if (!parentQuestion || !parentQuestion.sub_questions) return;
+    
+    // Filter out the sub-question to delete
+    const updatedSubQuestions = parentQuestion.sub_questions.filter((sq: any) => sq.id !== subQuestionId);
+    
+    // Update the parent question with the filtered sub-questions
+    const updatedQuestions = interviewGuide.questions.map((q: any) => {
+      if (q.id === questionId) {
+        return {
+          ...q,
+          sub_questions: updatedSubQuestions
+        };
+      }
+      return q;
+    });
+    
+    // Update the interview guide state
+    setInterviewGuide({
+      ...interviewGuide,
+      questions: updatedQuestions
+    });
+    
+    // Reset editing state
+    setEditingSubQuestion(null);
+    setEditedSubQuestion(null);
+    
+    // Save to database
+    updateInterviewGuide();
+    
+    toast({
+      title: "Success",
+      description: "Sub-question deleted successfully",
+      variant: "default"
+    });
+  };
+
+  // Function to handle adding a sub-question to an existing question
+  const handleAddSubQuestionToEdit = () => {
+    if (!editedQuestion || !newSubQuestionForEdit.trim()) return;
+    
+    // Create a new sub-question
+    const newSubQuestion = {
+      id: `sq${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      question: newSubQuestionForEdit.trim(),
+      notes: newSubQuestionNotesForEdit.trim()
+    };
+    
+    // Add the new sub-question to the edited question
+    setEditedQuestion({
+      ...editedQuestion,
+      sub_questions: [...(editedQuestion.sub_questions || []), newSubQuestion]
+    });
+    
+    // Reset the form
+    setNewSubQuestionForEdit('');
+    setNewSubQuestionNotesForEdit('');
+  };
+
+  // Function to handle removing a sub-question from an edited question
+  const handleRemoveSubQuestionFromEdit = (subQuestionId: string) => {
+    if (!editedQuestion) return;
+    
+    // Filter out the sub-question to remove
+    const updatedSubQuestions = (editedQuestion.sub_questions || []).filter(
+      (sq: any) => sq.id !== subQuestionId
+    );
+    
+    // Update the edited question
+    setEditedQuestion({
+      ...editedQuestion,
+      sub_questions: updatedSubQuestions
+    });
+  };
+
+  // Function to render a question box
+  const renderQuestionBox = (question: any, index: number) => {
+    const isEditing = editingQuestion === question.id;
+    
+    return (
+      <div key={question.id} className="border border-gray-200 rounded-xl p-5 mb-8 bg-white shadow-sm">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            {isEditing ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                  <textarea
+                    className="w-full rounded-md border border-gray-300 p-2"
+                    rows={2}
+                    value={editedQuestion.question}
+                    onChange={(e) => setEditedQuestion({ ...editedQuestion, question: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                    rows={2}
+                    value={editedQuestion.notes}
+                    onChange={(e) => setEditedQuestion({ ...editedQuestion, notes: e.target.value })}
+                  />
+                </div>
+                
+                {/* Sub-questions management when editing */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-md font-medium">Sub-questions</h4>
+                    <button
+                      onClick={handleAddSubQuestionToEdit}
+                      className="flex items-center gap-1 px-3 py-1 text-sm text-black hover:bg-gray-100 rounded-md transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add sub-question
+                    </button>
+                  </div>
+                  
+                  {editedQuestion.sub_questions && editedQuestion.sub_questions.length > 0 && (
+                    <div className="space-y-3 mb-4">
+                      {editedQuestion.sub_questions.map((sq: any) => (
+                        <div key={sq.id} className="p-3 bg-gray-50 rounded-md relative">
+                          <button
+                            onClick={() => handleRemoveSubQuestionFromEdit(sq.id)}
+                            className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </button>
+                          <h5 className="text-sm font-medium pr-6">{sq.question}</h5>
+                          {sq.notes && (
+                            <p className="text-xs font-mono text-gray-500 mt-1">{sq.notes}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="p-3 bg-gray-50 rounded-md">
+                    <div className="mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sub-question</label>
+                      <textarea
+                        className="w-full rounded-md border border-gray-300 p-2"
+                        rows={2}
+                        value={newSubQuestionForEdit}
+                        onChange={(e) => setNewSubQuestionForEdit(e.target.value)}
+                        placeholder="Enter a sub-question"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                      <textarea
+                        className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                        rows={2}
+                        value={newSubQuestionNotesForEdit}
+                        onChange={(e) => setNewSubQuestionNotesForEdit(e.target.value)}
+                        placeholder="Add notes about this sub-question (optional)"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center mt-2">
+                  <button
+                    onClick={() => handleDeleteQuestion(question.id)}
+                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    Delete Question
+                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <X className="h-4 w-4 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={handleSaveQuestion}
+                      className="p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <Check className="h-4 w-4 text-green-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h4 className="text-lg font-medium">{index + 1}. {question.question}</h4>
+                {question.notes && (
+                  <p className="text-xs font-mono text-gray-400 mt-1">{question.notes}</p>
+                )}
+              </>
+            )}
+          </div>
+          {!isEditing && (
+            <button
+              onClick={() => handleEditQuestion(question.id)}
+              className="p-1 rounded-full hover:bg-gray-100"
+            >
+              <Pencil className="h-4 w-4 text-gray-300" />
+            </button>
+          )}
+        </div>
+        
+        {/* Sub-questions */}
+        {!isEditing && question.sub_questions && question.sub_questions.length > 0 && (
+          <div className="ml-6 mt-4 space-y-4 border-l-2 border-gray-200 pl-4">
+            {question.sub_questions.map((subQ: any, subIndex: number) => {
+              const isEditingSub = editingSubQuestion === subQ.id;
+              
+              return (
+                <div key={subQ.id} className="relative">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      {isEditingSub ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Sub-question</label>
+                            <textarea
+                              className="w-full rounded-md border border-gray-300 p-2"
+                              rows={2}
+                              value={editedSubQuestion.question}
+                              onChange={(e) => setEditedSubQuestion({ ...editedSubQuestion, question: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                            <textarea
+                              className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                              rows={2}
+                              value={editedSubQuestion.notes}
+                              onChange={(e) => setEditedSubQuestion({ ...editedSubQuestion, notes: e.target.value })}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center mt-2">
+                            <button
+                              onClick={() => handleDeleteSubQuestion(question.id, subQ.id)}
+                              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                            >
+                              Delete Sub-question
+                            </button>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={handleCancelSubQuestionEdit}
+                                className="p-1 rounded-full hover:bg-gray-100"
+                              >
+                                <X className="h-4 w-4 text-gray-500" />
+                              </button>
+                              <button
+                                onClick={handleSaveSubQuestion}
+                                className="p-1 rounded-full hover:bg-gray-100"
+                              >
+                                <Check className="h-4 w-4 text-green-500" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <h5 className="text-md font-medium">{question.id}.{subIndex + 1}. {subQ.question}</h5>
+                          {subQ.notes && (
+                            <p className="text-xs font-mono text-gray-400 mt-1">{subQ.notes}</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {!isEditingSub && (
+                      <button
+                        onClick={() => handleEditSubQuestion(question.id, subQ.id)}
+                        className="p-1 rounded-full hover:bg-gray-100"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-300" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Function to handle adding a new question
+  const handleAddQuestion = () => {
+    if (!interviewGuide || !newQuestion.trim()) return;
+    
+    // Generate a unique ID for the new question
+    const newQuestionId = `q${Date.now()}`;
+    
+    // Create the new question object
+    const questionToAdd = {
+      id: newQuestionId,
+      question: newQuestion.trim(),
+      notes: newQuestionNotes.trim(),
+      sub_questions: newSubQuestions.map(sq => ({
+        ...sq,
+        id: `sq${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      }))
+    };
+    
+    // Add the new question to the interview guide
+    setInterviewGuide({
+      ...interviewGuide,
+      questions: [...interviewGuide.questions, questionToAdd]
+    });
+    
+    // Reset the form
+    setNewQuestion('');
+    setNewQuestionNotes('');
+    setNewSubQuestions([]);
+    setIsAddingQuestion(false);
+    
+    // Save to database
+    updateInterviewGuide();
+    
+    toast({
+      title: "Success",
+      description: "Question added successfully",
+      variant: "default"
+    });
+  };
+
+  // Function to handle adding a new sub-question
+  const handleAddSubQuestion = () => {
+    if (!newSubQuestion.trim()) return;
+    
+    // Add the new sub-question to the list
+    setNewSubQuestions([
+      ...newSubQuestions,
+      {
+        id: `temp_${Date.now()}`,
+        question: newSubQuestion.trim(),
+        notes: newSubQuestionNotes.trim()
+      }
+    ]);
+    
+    // Reset the sub-question form
+    setNewSubQuestion('');
+    setNewSubQuestionNotes('');
+  };
+
+  // Function to handle removing a sub-question
+  const handleRemoveSubQuestion = (id: string) => {
+    setNewSubQuestions(newSubQuestions.filter(sq => sq.id !== id));
   };
 
   return (
@@ -621,86 +922,189 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
           </button>
           <h1 className="text-3xl font-bold text-gray-900">{study?.title} - interview protocol</h1>
         </div>
+
+        {/* Action Cards */}
+        <div className="flex gap-4 mb-6">
+          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <Download className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-medium">Print Interview Protocol</h3>
+            </div>
+            <p className="text-xs text-gray-400">Get a printable version of your interview questions and notes</p>
+          </div>
+          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-medium">Launch Seena Note Taker</h3>
+            </div>
+            <p className="text-xs text-gray-400">Start taking notes during your interview with AI assistance</p>
+          </div>
+          <div className="flex-1 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <Mic className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-medium">Set Up Seena Voice Agent</h3>
+            </div>
+            <p className="text-xs text-gray-400">Configure AI voice agent to conduct the interview</p>
+          </div>
+        </div>
         
         <div className="bg-white rounded-lg border border-gray-300 p-6">
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-medium mb-2">Interview Questions</h2>
-              <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm bg-white/80 hover:bg-white/90 transition-all duration-300 shadow-md border border-gray-200/50"
-                        style={{ 
-                          '--offset': '1px',
-                          boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                        } as React.CSSProperties}
-                        onClick={generateInterviewGuide}
-                      >
-                        <span className="relative z-20 flex items-center gap-2">
-                          <Image
-                            src="/alpha-logo.svg"
-                            alt="Seena Logo"
-                            width={16}
-                            height={16}
-                            className="opacity-90"
-                          />
-                          <span className="text-black text-sm font-medium">Re-generate questions</span>
-                        </span>
-                      </button>
-                      
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
-                              <HelpCircle className="h-4 w-4 text-gray-600" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-black text-white border-none">
-                            <p>Ask Seena to generate a new set of questions</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-            </div>
+              <div>
+                <h2 className="text-lg font-medium mb-2">Interview Questions</h2>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-end gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setIsAddingQuestion(true)}
+                          className="w-auto py-2 px-4 rounded-md text-white font-medium relative overflow-hidden bg-black hover:bg-gray-900 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="relative z-20 flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            <span className="text-white text-sm font-medium">Add a question</span>
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black text-white border-none">
+                        <p>Manually add a question to your interview</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm bg-white/80 hover:bg-white/90 transition-all duration-300 shadow-md border border-gray-200/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ 
+                            '--offset': '1px',
+                            boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                          } as React.CSSProperties}
+                          onClick={generateInterviewGuide}
+                          disabled={isGenerating}
+                        >
+                          <span className="relative z-20 flex items-center gap-2">
+                            <Image
+                              src="/alpha-logo.svg"
+                              alt="Seena Logo"
+                              width={16}
+                              height={16}
+                              className="opacity-90"
+                            />
+                            <span className="text-black text-sm font-medium">Re-generate questions</span>
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black text-white border-none">
+                        <p>Ask Seena to generate a new set of questions</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
 
-           
+                {interviewGuide?.questions && interviewGuide.questions.length > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200 shadow-sm min-w-[80px]">
+                          <span className="font-doto text-3xl font-extrabold text-orange-500">{interviewGuide.duration_minutes}</span>
+                          <span className="text-xs text-gray-700">minutes</span>
+                          <span className="text-[10px] font-mono text-gray-500">est. duration</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black text-white border-none max-w-[300px]">
+                        <p>Interview duration is an estimate based on the average length of an answer of 1-3 minutes per question</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
 
             {/* Interview setup content */}
             <div className="space-y-4">
-            
               {/* Interview Setup Form Fields */}
               <div className="space-y-6">
+              
+                {/* Duration */}
+                {/* <div>
+                  <h3 className="text-lg font-medium mb-2">Interview Duration</h3>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="block w-32 rounded-md border border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="60"
+                      value={interviewGuide?.duration_minutes || 60}
+                      onChange={(e) => {
+                        if (interviewGuide) {
+                          setInterviewGuide({
+                            ...interviewGuide,
+                            duration_minutes: parseInt(e.target.value) || 60
+                          });
+                        }
+                      }}
+                    />
+                    <span className="text-gray-600">minutes</span>
+                  </div>
+                </div> */}
+
                 {/* Question Bank */}
                 <div>
-                  
+                  {interviewGuide?.questions && interviewGuide.questions.length > 0 ? (
+                    <div className="space-y-8">
+                      {interviewGuide.questions.map((question: any, index: number) => 
+                        renderQuestionBox(question, index)
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                      rows={10}
+                      placeholder="Interview questions will appear here after generation"
+                      value={formatInterviewGuideQuestions(interviewGuide?.questions || [])}
+                      onChange={(e) => {
+                        if (interviewGuide) {
+                          setInterviewGuide({
+                            ...interviewGuide,
+                            questions: e.target.value.split('\n').map(q => q.trim())
+                          });
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* System Prompt */}
+                {/* <div>
+                  <h3 className="text-lg font-medium mb-2">System Prompt</h3>
                   <textarea
                     className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    rows={10}
-                    placeholder="Interview questions will appear here after generation"
-                    value={formatInterviewQuestions()}
+                    rows={4}
+                    placeholder="System prompt for the interviewer will appear here"
+                    value={interviewGuide?.system_prompt || ''}
                     onChange={(e) => {
-                      // Store the edited text in the study's research_questions field
-                      // This will be used by the updateInterviewQuestions function
-                      if (study) {
-                        setStudy({
-                          ...study,
-                          research_questions: e.target.value
+                      if (interviewGuide) {
+                        setInterviewGuide({
+                          ...interviewGuide,
+                          system_prompt: e.target.value
                         });
                       }
                     }}
                   />
-                </div>
+                </div> */}
+
                 <div className="flex justify-end mt-4">
-                  <PrimaryButton 
-                    onClick={updateInterviewQuestions}
+                  {/* <PrimaryButton 
+                    onClick={updateInterviewGuide}
                     disabled={isUpdating}
                   >
                     {isUpdating ? 'Updating...' : 'Update'}
-                  </PrimaryButton>
+                  </PrimaryButton> */}
                 </div>
-                
-                
               </div>
             </div>
           </div>
@@ -736,6 +1140,122 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
           <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-md p-6 bg-white/80 backdrop-blur-md border border-gray-200/50 rounded-2xl shadow-xl">
             <div className="text-red-500 text-center">Error: {error}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Question Dialog */}
+      {isAddingQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setIsAddingQuestion(false)} />
+          
+          {/* Dialog */}
+          <div className="relative z-10 w-full max-w-2xl p-6 bg-white/80 backdrop-blur-md border border-gray-200/50 rounded-2xl shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-medium">Add a New Question</h3>
+              <button
+                onClick={() => setIsAddingQuestion(false)}
+                className="p-1 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                <textarea
+                  className="w-full rounded-md border border-gray-300 p-2"
+                  rows={3}
+                  value={newQuestion}
+                  onChange={(e) => setNewQuestion(e.target.value)}
+                  placeholder="Enter your question here"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                  rows={2}
+                  value={newQuestionNotes}
+                  onChange={(e) => setNewQuestionNotes(e.target.value)}
+                  placeholder="Add notes about this question (optional)"
+                />
+              </div>
+              
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-md font-medium">Sub-questions</h4>
+                  <button
+                    onClick={handleAddSubQuestion}
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add sub-question
+                  </button>
+                </div>
+                
+                {newSubQuestions.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {newSubQuestions.map((sq) => (
+                      <div key={sq.id} className="p-3 bg-gray-50 rounded-md relative">
+                        <button
+                          onClick={() => handleRemoveSubQuestion(sq.id)}
+                          className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </button>
+                        <h5 className="text-sm font-medium pr-6">{sq.question}</h5>
+                        {sq.notes && (
+                          <p className="text-xs font-mono text-gray-500 mt-1">{sq.notes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <div className="mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Sub-question</label>
+                    <textarea
+                      className="w-full rounded-md border border-gray-300 p-2"
+                      rows={2}
+                      value={newSubQuestion}
+                      onChange={(e) => setNewSubQuestion(e.target.value)}
+                      placeholder="Enter a sub-question"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                      rows={2}
+                      value={newSubQuestionNotes}
+                      onChange={(e) => setNewSubQuestionNotes(e.target.value)}
+                      placeholder="Add notes about this sub-question (optional)"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setIsAddingQuestion(false)}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md mr-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddQuestion}
+                  disabled={!newQuestion.trim()}
+                  className="px-4 py-2 text-sm text-white bg-black hover:bg-gray-900 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Question
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

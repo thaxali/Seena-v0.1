@@ -35,6 +35,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStudy, setEditedStudy] = useState<Study | null>(null);
   const [setupInterviewOpen, setSetupInterviewOpen] = useState(false);
+  const [hasInterviewGuide, setHasInterviewGuide] = useState(false);
 
   // Function to check if study setup is complete
   const isStudySetupComplete = (study: Study): boolean => {
@@ -79,6 +80,22 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
         console.log('Study found:', data);
         setStudy(data);
+        
+        // Check if an interview guide exists for this study
+        const { data: guideData, error: guideError } = await supabase
+          .from('interview_guides')
+          .select('id')
+          .eq('study_id', id)
+          .limit(1)
+          .single();
+          
+        if (!guideError && guideData) {
+          console.log('Interview guide exists for this study');
+          setHasInterviewGuide(true);
+        } else {
+          console.log('No interview guide found for this study');
+          setHasInterviewGuide(false);
+        }
       } catch (err) {
         console.error('Error fetching study details:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch study details');
@@ -391,9 +408,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                   )}
                   <button
                     onClick={handleEditStudy}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="btn-secondary whitespace-nowrap"
                   >
-                    <Pencil className="h-4 w-4" />
                     Edit Details
                   </button>
                 </>
@@ -489,14 +505,33 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
           <div className="p-4 border-b border-gray-300 flex justify-between items-center">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-semibold">Interviews</h2>
-              <div className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
+              {hasInterviewGuide ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="btn-primary"
+                        onClick={() => router.push(`/studies/${id}/interview-setup`)}
+                      >
+                        Interview Questions
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-black text-white border-none max-w-[300px]">
+                      <p>View and edit your interview questions</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
                 <button
-                  className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
+                  className={`w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{ 
                     '--offset': '1px',
                     boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
                   } as React.CSSProperties}
-                  onClick={() => router.push(`/studies/${id}/interview-setup`)}
+                  onClick={() => isStudySetupComplete(study) && router.push(`/studies/${id}/interview-setup`)}
+                  disabled={!isStudySetupComplete(study)}
                 >
                   <span className="relative z-20 flex items-center gap-2">
                     <Image
@@ -523,27 +558,15 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                     }}
                   />
                 </button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
-                        <HelpCircle className="h-4 w-4 text-gray-500" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-black text-white border-none max-w-[300px]">
-                      <p>Creates intro, consent, questions & wrap-up—instantly.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+              )}
+              <button 
+                className={`btn-secondary ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!isStudySetupComplete(study)}
+                onClick={() => setShowAddInterviewDialog(true)}
+              >
+                Import Interview
+              </button>
             </div>
-            <button 
-              className={`btn-secondary ${!isStudySetupComplete(study) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!isStudySetupComplete(study)}
-              onClick={() => setShowAddInterviewDialog(true)}
-            >
-              Import Interview
-            </button>
           </div>
           <div className="overflow-x-auto">
             {loading ? (

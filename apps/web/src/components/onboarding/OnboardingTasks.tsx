@@ -81,7 +81,7 @@ export default function OnboardingTasks({ onMinimize }: OnboardingTasksProps) {
   }
 
   return (
-    <div className="mb-4 p-4 bg-white rounded-lg border border-gray-300 relative overflow-hidden">
+    <div className="mb-4 p-4 relative overflow-hidden rounded-lg bg-gray-100/80 backdrop-blur-sm border border-gray-200/50 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
       {showConfetti && (
         <div className="absolute inset-0 pointer-events-none">
           <Confetti

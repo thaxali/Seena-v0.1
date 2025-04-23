@@ -19,6 +19,8 @@
   },
   "packageManager": "npm@10.2.4",
   "dependencies": {
-    "@heroicons/react": "^2.2.0"
+    "@heroicons/react": "^2.2.0",
+    "@radix-ui/react-select": "^2.2.2",
+    "lucide-react": "^0.503.0"
   }
 }

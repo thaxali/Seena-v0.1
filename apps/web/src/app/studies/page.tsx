@@ -22,6 +22,11 @@ export default function StudiesPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Redirect to dashboard since the studies page is no longer needed
+    router.push('/dashboard');
+  }, [router]);
+
+  useEffect(() => {
     async function fetchStudies() {
       try {
         const { data: { user } } = await supabase.auth.getUser();

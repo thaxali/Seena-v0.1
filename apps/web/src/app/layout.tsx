@@ -28,7 +28,24 @@ export default function RootLayout({
             {children}
           </ProfileProvider>
         </AuthProvider>
-        <Toaster position="top-right" />
+        <Toaster 
+          position="top-right"
+          theme="light"
+          richColors
+          toastOptions={{
+            style: {
+              padding: '1rem',
+              borderRadius: '0.85rem',
+              backdropFilter: 'blur(10px)',
+              fontSize: '0.65rem',
+              lineHeight: '1.25rem',
+              fontFamily: 'monospace',
+              backgroundColor: 'rgba(240, 240, 240, 0.8)',
+              border: '0.5px solid rgba(255, 255, 255, 0.4)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }
+          }}
+        />
       </body>
     </html>
   );

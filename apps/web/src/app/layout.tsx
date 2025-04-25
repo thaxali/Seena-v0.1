@@ -39,6 +39,7 @@ export default function RootLayout({
               backdropFilter: 'blur(10px)',
               fontSize: '0.65rem',
               lineHeight: '1.25rem',
+              color: 'black',
               fontFamily: 'monospace',
               backgroundColor: 'rgba(240, 240, 240, 0.8)',
               border: '0.5px solid rgba(255, 255, 255, 0.4)',

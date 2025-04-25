@@ -59,6 +59,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   const [editedSubQuestion, setEditedSubQuestion] = useState<any>(null);
   const [newSubQuestionForEdit, setNewSubQuestionForEdit] = useState('');
   const [newSubQuestionNotesForEdit, setNewSubQuestionNotesForEdit] = useState('');
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   
   // Loading messages to display while waiting for GPT response
   const loadingMessages = [
@@ -73,7 +74,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (isLoading && showLoadingMessages) {
+    if (showLoadingMessages) {
       // Start with the first message
       setLoadingMessageIndex(0);
       
@@ -94,40 +95,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         clearInterval(interval);
       }
     };
-  }, [isLoading, showLoadingMessages]);
-  
-  // Effect to handle the loading animation when GPT response is received
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    
-    if (!isLoading && showLoadingMessages) {
-      console.log('Loading complete, cycling through messages');
-      // When loading is complete, quickly cycle through all messages
-      let currentIndex = loadingMessageIndex;
-      
-      const cycleThroughMessages = () => {
-        if (currentIndex < loadingMessages.length - 1) {
-          currentIndex++;
-          setLoadingMessageIndex(currentIndex);
-          timeout = setTimeout(cycleThroughMessages, 300); // Faster transitions
-        } else {
-          // After showing all messages, hide the loading indicator
-          timeout = setTimeout(() => {
-            console.log('Dismissing loading indicator');
-            setShowLoadingMessages(false);
-          }, 500);
-        }
-      };
-      
-      timeout = setTimeout(cycleThroughMessages, 300);
-    }
-    
-    return () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    };
-  }, [isLoading, showLoadingMessages, loadingMessageIndex]);
+  }, [showLoadingMessages]);
 
   useEffect(() => {
     async function fetchStudyDetails() {
@@ -208,21 +176,18 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       setShowLoadingMessages(true);
       setLoadingMessageIndex(0);
       
+      // Create a new AbortController for this request
+      const controller = new AbortController();
+      setAbortController(controller);
+      
       // Format research questions properly
       let formattedResearchQuestions = '';
       if (study?.research_questions) {
         if (Array.isArray(study.research_questions)) {
           formattedResearchQuestions = study.research_questions
             .map((q: any) => {
-              // If q is an object with a question property, use that
-              if (typeof q === 'object' && q.question) {
-                return q.question;
-              }
-              // If q is a string, use it directly
-              if (typeof q === 'string') {
-                return q;
-              }
-              // Otherwise, try to convert to string
+              if (typeof q === 'object' && q.question) return q.question;
+              if (typeof q === 'string') return q;
               return JSON.stringify(q);
             })
             .join(', ');
@@ -253,6 +218,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
             action: 'generate_interview_guide'
           }
         }),
+        signal: controller.signal  // Add the abort signal to the fetch request
       });
 
       if (!response.ok) {
@@ -262,16 +228,13 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       const data = await response.json();
       console.log('Raw GPT response:', data);
 
-      // Check if the response has the expected structure
       if (!data || !data.content) {
         console.error('Invalid response format:', data);
         throw new Error('Invalid interview guide format received');
       }
 
-      // Process the guide data from the content property
       const guideData = data.content;
       
-      // Ensure questions is an array
       if (!Array.isArray(guideData.questions)) {
         console.error('Questions is not an array:', guideData.questions);
         throw new Error('Interview guide questions must be an array');
@@ -280,37 +243,95 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       // Format the questions with IDs
       const formattedQuestions = formatInterviewGuideQuestions(guideData.questions);
       
-      // Update the interview guide state with the new data
-      setInterviewGuide({
+      console.log('📝 Saving generated questions to database:', {
+        questionCount: formattedQuestions.length,
+        studyId: study?.id
+      });
+
+      // First update the local state to ensure interviewGuide is not null
+      const newInterviewGuide = {
         questions: formattedQuestions,
         instructions: guideData.instructions || '',
         system_prompt: guideData.system_prompt || '',
         duration_minutes: guideData.duration_minutes || 60
+      };
+      
+      setInterviewGuide(newInterviewGuide);
+
+      // Then save to database
+      const { error: saveError } = await supabase
+        .from('interview_guides')
+        .upsert({
+          study_id: study?.id,
+          questions: formattedQuestions,
+          instructions: guideData.instructions || '',
+          system_prompt: guideData.system_prompt || '',
+          duration_minutes: guideData.duration_minutes || 60,
+          updated_at: new Date().toISOString()
+        });
+
+      if (saveError) {
+        console.error('❌ Error saving to database:', saveError);
+        throw saveError;
+      }
+
+      console.log('✅ Database update successful, verifying...');
+
+      // Verify the update
+      const { data: updatedGuide, error: verifyError } = await supabase
+        .from('interview_guides')
+        .select('questions')
+        .eq('study_id', study?.id)
+        .single();
+
+      if (verifyError) {
+        console.error('❌ Failed to verify update:', verifyError);
+        throw verifyError;
+      }
+
+      console.log('✅ Update verified:', {
+        savedQuestionCount: formattedQuestions.length,
+        databaseQuestionCount: updatedGuide.questions.length,
+        questionsMatch: JSON.stringify(formattedQuestions) === JSON.stringify(updatedGuide.questions)
       });
 
-      // Save to database
-      await updateInterviewGuide();
+      // Only dismiss loading indicator after successful completion
+      setShowLoadingMessages(false);
+      setIsGenerating(false);
+      setAbortController(null);  // Clear the abort controller
 
       toast({
         title: "Success",
-        description: "Interview guide has been regenerated successfully.",
+        description: "Interview guide has been generated and saved successfully.",
         variant: "default"
       });
 
-    } catch (error) {
-      console.error('Error generating interview guide:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate interview guide. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      // Only hide loading messages and generating state after a short delay
-      // This ensures the last loading message is visible
-      setTimeout(() => {
-        setShowLoadingMessages(false);
-        setIsGenerating(false);
-      }, 1000);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Request was cancelled');
+        toast({
+          title: "Cancelled",
+          description: "Question generation was cancelled.",
+          variant: "default"
+        });
+      } else {
+        console.error('❌ Error generating interview guide:', error);
+        toast({
+          title: "Error",
+          description: "Failed to generate interview guide. Please try again.",
+          variant: "destructive"
+        });
+      }
+      // Also dismiss loading indicator on error or cancellation
+      setShowLoadingMessages(false);
+      setIsGenerating(false);
+      setAbortController(null);  // Clear the abort controller
+    }
+  };
+
+  const handleCancelGeneration = () => {
+    if (abortController) {
+      abortController.abort();
     }
   };
 
@@ -337,7 +358,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       console.log('🔍 Checking for existing interview guide...');
       const { data: existingGuide, error: fetchError } = await supabase
         .from('interview_guides')
-        .select('id')
+        .select('*')  // Changed from just 'id' to '*' to get all fields
         .eq('study_id', study.id)
         .single();
         
@@ -354,7 +375,10 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       // Prepare the data to save
       const guideData = {
         study_id: study.id,
-        questions: interviewGuide.questions,
+        questions: interviewGuide.questions.map(q => ({
+          ...q,
+          sub_questions: q.sub_questions || []  // Ensure sub_questions is always an array
+        })),
         instructions: interviewGuide.instructions,
         system_prompt: interviewGuide.system_prompt,
         duration_minutes: interviewGuide.duration_minutes,
@@ -396,7 +420,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       // Verify the update was successful
       const { data: updatedGuide, error: verifyError } = await supabase
         .from('interview_guides')
-        .select('questions')
+        .select('*')  // Changed from just 'questions' to '*' to get all fields
         .eq('study_id', study.id)
         .single();
 
@@ -405,12 +429,22 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         throw verifyError;
       }
 
+      // Normalize the data structures before comparison
+      const normalizeQuestions = (questions: any[]) => 
+        questions.map(q => ({
+          ...q,
+          sub_questions: q.sub_questions || []
+        }));
+
+      const savedQuestions = normalizeQuestions(guideData.questions);
+      const dbQuestions = normalizeQuestions(updatedGuide.questions);
+
       console.log('✅ Update verified:', {
-        savedQuestionCount: interviewGuide.questions.length,
-        databaseQuestionCount: updatedGuide.questions.length,
-        questionsMatch: JSON.stringify(interviewGuide.questions) === JSON.stringify(updatedGuide.questions),
-        savedQuestions: interviewGuide.questions,
-        databaseQuestions: updatedGuide.questions
+        savedQuestionCount: savedQuestions.length,
+        databaseQuestionCount: dbQuestions.length,
+        questionsMatch: JSON.stringify(savedQuestions) === JSON.stringify(dbQuestions),
+        savedQuestions,
+        databaseQuestions: dbQuestions
       });
 
     } catch (err) {
@@ -898,9 +932,39 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
       });
       
       // First update the database
-      await saveInterviewGuideToDatabase(updatedQuestions);
-      
-      console.log('✅ Database update successful, updating local state...');
+      console.log('🔄 Saving to database...');
+      const { error } = await supabase
+        .from('interview_guides')
+        .update({
+          questions: updatedQuestions,
+          updated_at: new Date().toISOString()
+        })
+        .eq('study_id', study.id);
+
+      if (error) {
+        console.error('❌ Database update failed:', error);
+        throw error;
+      }
+
+      console.log('✅ Database update successful, verifying...');
+
+      // Verify the update
+      const { data: updatedGuide, error: verifyError } = await supabase
+        .from('interview_guides')
+        .select('questions')
+        .eq('study_id', study.id)
+        .single();
+
+      if (verifyError) {
+        console.error('❌ Failed to verify update:', verifyError);
+        throw verifyError;
+      }
+
+      console.log('✅ Update verified:', {
+        savedQuestionCount: updatedQuestions.length,
+        databaseQuestionCount: updatedGuide.questions.length,
+        questionsMatch: JSON.stringify(updatedQuestions) === JSON.stringify(updatedGuide.questions)
+      });
       
       // If database update was successful, update the local state
       setInterviewGuide({
@@ -1323,6 +1387,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                   <button
                     onClick={() => setIsAddingQuestion(true)}
                     className="btn-secondary"
+                    disabled={loading}
                   >
                     <span className="relative z-20 flex items-center gap-2">
                       <Plus className="h-4 w-4" />
@@ -1346,7 +1411,7 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                       boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
                     } as React.CSSProperties}
                     onClick={generateInterviewGuide}
-                    disabled={isGenerating}
+                    disabled={loading || isGenerating}
                   >
                     <span className="relative z-20 flex items-center gap-2">
                       <Image
@@ -1402,7 +1467,27 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
 
       {/* Question Bank */}
       <div>
-        {interviewGuide?.questions && interviewGuide.questions.length > 0 ? (
+        {loading ? (
+          // Skeleton loader for initial page load
+          <div className="space-y-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border border-gray-100 bg-white rounded-xl p-5 mb-8 shadow-xs animate-pulse">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                  </div>
+                  <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                </div>
+                <div className="ml-6 mt-4 space-y-4 border-l-2 border-gray-200 pl-4">
+                  {[1, 2].map((j) => (
+                    <div key={j} className="h-3 bg-gray-100 rounded w-2/3"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : interviewGuide?.questions && interviewGuide.questions.length > 0 ? (
           <div className="space-y-8">
             {interviewGuide.questions.map((question: any, index: number) => 
               renderQuestionBox(question, index)
@@ -1419,8 +1504,8 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
         )}
       </div>
 
-      {/* Loading Overlay */}
-      {(loading || debugMode || isLoading || showLoadingMessages) && (
+      {/* Generation Loading Overlay - Only show when generating questions */}
+      {showLoadingMessages && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
           <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" />
@@ -1435,8 +1520,14 @@ export default function InterviewSetupPage({ params }: InterviewSetupPageProps) 
                 height={100}
               />
               <p className="mt-4 text-gray-600 text-center">
-                {showLoadingMessages ? loadingMessages[loadingMessageIndex] : 'Setting up your interview...'}
+                {loadingMessages[loadingMessageIndex]}
               </p>
+              <button
+                onClick={handleCancelGeneration}
+                className="mt-4 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              >
+                Cancel Generation
+              </button>
             </div>
           </div>
         </div>

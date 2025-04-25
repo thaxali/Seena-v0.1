@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Study } from '@/types/study';
-import { MoreVertical, Trash2, ChevronLeft, Bug, Pencil, HelpCircle, Plus, FileQuestion, Check, X, Loader2, Download, Mic, FileText } from 'lucide-react';
+import { MoreVertical, Trash2, ChevronLeft, Bug, Pencil, HelpCircle, Plus, FileQuestion, Check, X, Loader2, Download, Mic, FileText, Rocket } from 'lucide-react';
 import AddInterviewDialog from './AddInterviewDialog';
 import { Interview } from "@/lib/services/interview";
 import InterviewDetailsDialog from "@/components/studies/InterviewDetailsDialog";
@@ -66,6 +66,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
     system_prompt: string;
     duration_minutes: number;
   } | null>(null);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
 
   // Add debug logs
   useEffect(() => {
@@ -203,6 +204,15 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
     } catch (error) {
       console.error('Error fetching interview details:', error);
     }
+  };
+
+  const handleUpdateInterview = (updatedInterview: Interview) => {
+    setSelectedInterview(updatedInterview);
+    setInterviews(prevInterviews =>
+      prevInterviews.map(interview =>
+        interview.id === updatedInterview.id ? updatedInterview : interview
+      )
+    );
   };
 
   const handleEditStudy = () => {
@@ -488,6 +498,11 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
     }
   };
 
+  const handleStartInterview = (participantName: string) => {
+    // ... existing start interview logic ...
+    setShowSetupDialog(false);
+  };
+
   const renderTabContent = () => {
     console.log('Rendering tab content for:', activeTab);
     if (!study) {
@@ -677,8 +692,222 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
       case 'notetaker':
         return (
           <div className="bg-white rounded-lg border border-gray-300 p-6">
-            <h2 className="text-xl font-semibold mb-4">Notetaker</h2>
-            <p className="text-gray-500">Coming soon...</p>
+            <h2 className="text-xl font-semibold mb-4">Interview Tools</h2>
+            {!hasInterviewGuide ? (
+              <>
+                <div className="text-center py-4">
+                  <p className="text-gray-500 mb-6">You need to create your interview questions before you can use the interview tools.</p>
+                  <button
+                    onClick={() => handleTabClick('questions')}
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    <FileQuestion className="h-4 w-4" />
+                    <span>Go to Questions</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-8 mt-8">
+                  {/* Download Interview Guide Card */}
+                  <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                      borderRadius: '1rem',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <div className="relative">
+                      <Image
+                        src="/interview-tools-cards/Guide.jpg"
+                        alt="Interview Guide Preview"
+                        width={96}
+                        height={168}
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-md font-semibold">Download Interview Guide</h3>
+                      <p className="text-xs text-gray-600">
+                        Use offline with pen & paper or a custom tool. Perfect for in-person interviews or when you prefer traditional note-taking methods.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Seena Notetaker Card */}
+                  <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                      borderRadius: '1rem',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <div className="relative">
+                      <Image
+                        src="/interview-tools-cards/notetaker.png"
+                        alt="Notetaker Preview"
+                        width={96}
+                        height={168}
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-md font-semibold">Seena Notetaker</h3>
+                      <p className="text-xs text-gray-600">
+                        Take live notes linked to each question. Features include timestamps, tags, and automatic question tracking. Ideal for detailed note-taking during interviews.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Seena Voice Interviewer Card */}
+                  <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                      borderRadius: '1rem',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <div className="relative">
+                      <Image
+                        src="/interview-tools-cards/Seenainterviewer.jpg"
+                        alt="Voice Interviewer Preview"
+                        width={96}
+                        height={168}
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-md font-semibold">Seena Voice Interviewer</h3>
+                      <p className="text-xs text-gray-600">
+                        Hands-free interviews with automatic transcription and AI-powered insights. Perfect for remote interviews or when you want to focus on the conversation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 mb-6">Pick your preferred way to collect responses:</p>
+                
+                <div className="flex justify-center">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
+                    {/* Download Interview Guide Card */}
+                    <div className="relative group overflow-hidden">
+                      <div className="absolute inset-0 bg-white rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500" />
+                      <div className="relative h-full bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        {/* Image container - will be replaced with actual image */}
+                        <div className="relative w-full aspect-[4/5] overflow-hidden rounded-t-xl">
+                          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 to-transparent" />
+                          <Image
+                            src="/interview-tools-cards/Guide.jpg"
+                            alt="Interview Guide Preview"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="p-6">
+                          <div className="flex flex-col h-full min-h-[200px]">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-medium mb-2">Download Interview Guide</h3>
+                              <p className="text-gray-600 text-sm">Use offline with pen & paper or a custom tool.</p>
+                            </div>
+                            <div className="mt-auto pt-4">
+                              <a
+                                href={`/studies/${study.id}/interview-guide`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-secondary w-full flex items-center justify-center gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                <span>Download Guide</span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seena Notetaker Card */}
+                    <div className="relative group overflow-hidden">
+                      <div className="absolute inset-0 bg-white rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500" />
+                      <div className="relative h-full bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        {/* Image container - will be replaced with actual image */}
+                        <div className="relative w-full aspect-[4/5] overflow-hidden rounded-t-xl">
+                          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 to-transparent" />
+                          <Image
+                            src="/interview-tools-cards/notetaker.png"
+                            alt="Notetaker Preview"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="p-6">
+                          <div className="flex flex-col h-full min-h-[200px]">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-medium mb-2">Seena Notetaker</h3>
+                              <p className="text-gray-600 text-sm">Take live notes linked to each question. Now with timestamps and tags.</p>
+                            </div>
+                            <div className="mt-auto pt-4">
+                              <a
+                                href={`/studies/${study.id}/notetaker`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-primary w-full flex items-center justify-center gap-2"
+                              >
+                                <Rocket className="h-4 w-4" />
+                                <span>Launch Notetaker</span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seena Voice Interviewer Card */}
+                    <div className="relative group overflow-hidden">
+                      <div className="absolute inset-0 bg-white rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500" />
+                      <div className="relative h-full bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        {/* Image container - will be replaced with actual image */}
+                        <div className="relative w-full aspect-[4/5] overflow-hidden rounded-t-xl">
+                          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 to-transparent" />
+                          <Image
+                            src="/interview-tools-cards/Seenainterviewer.jpg"
+                            alt="Voice Interviewer Preview"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="p-6">
+                          <div className="flex flex-col h-full min-h-[200px]">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-medium mb-2">Seena Voice Interviewer</h3>
+                              <p className="text-gray-600 text-sm">Hands-free interviews. Seena asks the questions, transcribes, and summarizes insights for you.</p>
+                            </div>
+                            <div className="mt-auto pt-4">
+                              <a
+                                href={`/studies/${study.id}/voice-interviewer`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-primary w-full flex items-center justify-center gap-2"
+                              >
+                                <Mic className="h-4 w-4" />
+                                <span>Start Interview</span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         );
       case 'interviews':
@@ -864,13 +1093,14 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         {/* Sticky Tabs Menu */}
         <div className="sticky top-4 z-10">
           <div className="flex items-center justify-center py-2">
-            <div className="flex items-center gap-2 p-1 rounded-full bg-gray-200/80 backdrop-blur-sm border border-gray-200/50 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center gap-2 p-1 rounded-full bg-black/80 
+            backdrop-blur-sm border border-white/50 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
               <button
                 onClick={() => handleTabClick('setup')}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   activeTab === 'setup'
-                    ? 'bg-black text-white'
-                    : 'text-gray-600 hover:bg-black hover:text-[#ff5021]'
+                    ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
                 }`}
               >
                 Setup
@@ -879,8 +1109,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 onClick={() => handleTabClick('questions')}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   activeTab === 'questions'
-                    ? 'bg-black text-white'
-                    : 'text-gray-600 hover:bg-black hover:text-[#ff5021]'
+                    ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
                 }`}
               >
                 Questions
@@ -889,18 +1119,18 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 onClick={() => handleTabClick('notetaker')}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   activeTab === 'notetaker'
-                    ? 'bg-black text-white'
-                    : 'text-gray-600 hover:bg-black hover:text-[#ff5021]'
+                    ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
                 }`}
               >
-                Notetaker
+                Interview Tools
               </button>
               <button
                 onClick={() => handleTabClick('interviews')}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   activeTab === 'interviews'
-                    ? 'bg-black text-white'
-                    : 'text-gray-600 hover:bg-black hover:text-[#ff5021]'
+                     ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
                 }`}
               >
                 Interviews
@@ -909,8 +1139,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 onClick={() => handleTabClick('insights')}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   activeTab === 'insights'
-                    ? 'bg-black text-white'
-                    : 'text-gray-600 hover:bg-black hover:text-[#ff5021]'
+                     ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
                 }`}
               >
                 Insights
@@ -937,22 +1167,20 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
       />
 
       <InterviewDetailsDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
         interview={selectedInterview}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onUpdate={(updatedInterview) => {
-          setSelectedInterview(updatedInterview);
-          setInterviews(prevInterviews =>
-            prevInterviews.map(interview =>
-              interview.id === updatedInterview.id ? updatedInterview : interview
-            )
-          );
+        onStartInterview={() => {
+          if (selectedInterview) {
+            router.push(`/studies/${study.id}/interviews/${selectedInterview.id}`);
+          }
         }}
       />
 
-      <SetupInterviewDialog 
-        open={setupInterviewOpen} 
-        onOpenChange={setSetupInterviewOpen} 
+      <SetupInterviewDialog
+        isOpen={showSetupDialog}
+        onClose={() => setShowSetupDialog(false)}
+        onStart={handleStartInterview}
       />
     </div>
   );

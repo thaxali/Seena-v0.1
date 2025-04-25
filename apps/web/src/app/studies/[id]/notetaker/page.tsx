@@ -466,7 +466,7 @@ export default function NotetakerPage({ params }: NotetakerPageProps) {
           <div className="bg-white rounded-lg p-6 max-w-3xl max-h-[80vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">Interview Summary</h2>
             {renderSummary()}
-            <div className="mt-6 flex justify-end">
+            <div className="btn-primary mt-6 flex justify-end">
               <Button onClick={() => window.location.href = '/dashboard'}>
                 Return to Dashboard
               </Button>

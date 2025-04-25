@@ -8,7 +8,7 @@ import { MoreVertical, Trash2, ChevronLeft, Bug, Pencil, HelpCircle, Plus, FileQ
 import AddInterviewDialog from './AddInterviewDialog';
 import { Interview } from "@/lib/services/interview";
 import InterviewDetailsDialog from "@/components/studies/InterviewDetailsDialog";
-import { getInterviewsForStudy, getInterviewById } from "@/lib/services/interview";
+import { getInterviewsForStudy, getInterviewById, deleteInterview } from "@/lib/services/interview";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,6 +19,8 @@ import Image from "next/image";
 import StudyProgress from './StudyProgress';
 import { toast } from 'sonner';
 import InterviewSetupPage from '@/app/studies/[id]/interview-setup/page';
+import InterviewsList from './InterviewsList';
+import { Button } from "@/components/ui/button";
 
 interface StudyDetailsProps {
   id: string;
@@ -196,14 +198,9 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
     }
   };
 
-  const handleInterviewClick = async (interviewId: string) => {
-    try {
-      const interview = await getInterviewById(interviewId);
-      setSelectedInterview(interview);
-      setIsDialogOpen(true);
-    } catch (error) {
-      console.error('Error fetching interview details:', error);
-    }
+  const handleInterviewClick = (interview: Interview) => {
+    setSelectedInterview(interview);
+    setIsDialogOpen(true);
   };
 
   const handleUpdateInterview = (updatedInterview: Interview) => {
@@ -503,6 +500,34 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
     setShowSetupDialog(false);
   };
 
+  const handleDeleteInterview = async (interview: Interview) => {
+    try {
+      await deleteInterview(interview.id);
+      
+      // Update the interviews list
+      const updatedInterviews = interviews.filter(i => i.id !== interview.id);
+      setInterviews(updatedInterviews);
+      
+      // Show success message
+      toast.success('Interview deleted successfully');
+    } catch (error) {
+      console.error('Error deleting interview:', error);
+      toast.error('Failed to delete interview');
+    }
+  };
+
+  const handleLaunchNotetaker = () => {
+    setActiveTab('notetaker');
+  };
+
+  const handleLaunchAIInterviewer = () => {
+    setSetupInterviewOpen(true);
+  };
+
+  const handleManualAdd = () => {
+    setShowAddInterviewDialog(true);
+  };
+
   const renderTabContent = () => {
     console.log('Rendering tab content for:', activeTab);
     if (!study) {
@@ -514,174 +539,174 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
       case 'setup':
         console.log('Rendering setup tab content');
         return (
-          <div className="bg-white rounded-lg border border-gray-300 p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="bg-white rounded-lg border border-gray-300 p-6">
+          <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-black">Study Details</h2>
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 {!isStudySetupComplete(study) && !isEditing && (
                   <div className="flex items-center gap-2">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
-                            style={{ 
-                              '--offset': '1px',
-                              boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
-                            } as React.CSSProperties}
-                            onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
-                          >
-                            <span className="relative z-20 flex items-center gap-2">
-                              <Image
-                                src="/liquidBlack.svg"
-                                alt="Seena Logo"
-                                width={16}
-                                height={16}
-                                className="opacity-90"
-                              />
-                              <span className="text-black text-sm">1. Study planner</span>
-                            </span>
-                            <div 
-                              className="absolute top-1/2 left-1/2 animate-spin-slow"
-                              style={{
-                                background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
-                                aspectRatio: '1',
-                                width: '100%',
-                              }}
-                            />
-                            <div 
-                              className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
-                              style={{
-                                boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
-                              }}
-                            />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-black text-white border-none max-w-[300px]">
-                          <p>Seena's Inception Agent helps you set goals, scope & key questions.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-                {isEditing ? (
-                  <>
-                    <button
-                      onClick={handleCancelEdit}
+                  <button
+                    className="w-auto py-2 px-4 rounded-full text-black font-mono relative overflow-hidden backdrop-blur-sm"
+                    style={{ 
+                      '--offset': '1px',
+                      boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.1)'
+                    } as React.CSSProperties}
+                    onClick={() => router.push(`/studies/${id}/setup?autoStart=true`)}
+                  >
+                    <span className="relative z-20 flex items-center gap-2">
+                      <Image
+                        src="/liquidBlack.svg"
+                        alt="Seena Logo"
+                        width={16}
+                        height={16}
+                        className="opacity-90"
+                      />
+                      <span className="text-black text-sm">1. Study planner</span>
+                    </span>
+                    <div 
+                      className="absolute top-1/2 left-1/2 animate-spin-slow"
+                      style={{
+                        background: 'conic-gradient(transparent 270deg, #ff5021, transparent)',
+                        aspectRatio: '1',
+                        width: '100%',
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-[1px] rounded-full bg-orange-500/95 backdrop-blur-sm"
+                      style={{
+                        boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.5)'
+                      }}
+                    />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black text-white border-none max-w-[300px]">
+                        <p>Seena's Inception Agent helps you set goals, scope & key questions.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleCancelEdit}
                       className="btn-secondary"
-                    >
-                      Cancel
-                    </button>
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    className="btn-primary"
+                  >
+                    Save Changes
+                  </button>
+                </>
+              ) : (
+                <>
+                  {isStudySetupComplete(study) && (
                     <button
-                      onClick={handleSaveEdit}
+                      onClick={() => router.push(`/studies/${id}/setup?edit=true`)}
                       className="btn-primary"
                     >
-                      Save Changes
+                      Inception Agent
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {isStudySetupComplete(study) && (
-                      <button
-                        onClick={() => router.push(`/studies/${id}/setup?edit=true`)}
-                        className="btn-primary"
-                      >
-                        Inception Agent
-                      </button>
-                    )}
-                    <button
-                      onClick={handleEditStudy}
+                  )}
+                  <button
+                    onClick={handleEditStudy}
                       className="btn-secondary whitespace-nowrap"
-                    >
-                      Edit Details
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <h3 className={`text-sm font-medium mb-2 ${study?.description ? 'text-gray-900' : 'bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 bg-clip-text text-transparent'}`}>Description</h3>
-                {isEditing ? (
-                  <textarea
-                    value={editedStudy?.description || ''}
-                    onChange={(e) => setEditedStudy(prev => prev ? { ...prev, description: e.target.value } : null)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    rows={3}
-                  />
-                ) : (
-                  study?.description && (
-                    <p className="text-gray-900 whitespace-pre-wrap">{study.description}</p>
-                  )
-                )}
-              </div>
-              <div>
-                <h3 className={`text-sm font-medium mb-2 ${study?.study_type ? 'text-gray-900' : 'text-gray-500'}`}>Study Type</h3>
-                {isEditing ? (
-                  <select
-                    value={editedStudy?.study_type || ''}
-                    onChange={(e) => setEditedStudy(prev => prev ? { ...prev, study_type: e.target.value as Study['study_type'] } : null)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
-                    <option value="">Select a study type</option>
-                    <option value="exploratory">Exploratory</option>
-                    <option value="comparative">Comparative</option>
-                    <option value="attitudinal">Attitudinal</option>
-                    <option value="behavioral">Behavioral</option>
-                  </select>
-                ) : (
-                  study?.study_type && (
-                    <p className="text-gray-900 capitalize">{study.study_type}</p>
-                  )
-                )}
-              </div>
-              <div>
-                <h3 className={`text-sm font-medium mb-2 ${study?.objective ? 'text-gray-900' : 'text-gray-500'}`}>Objective</h3>
-                {isEditing ? (
-                  <textarea
-                    value={editedStudy?.objective || ''}
-                    onChange={(e) => setEditedStudy(prev => prev ? { ...prev, objective: e.target.value } : null)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    rows={3}
-                  />
-                ) : (
-                  study?.objective && (
-                    <p className="text-gray-900">{study.objective}</p>
-                  )
-                )}
-              </div>
-              <div>
-                <h3 className={`text-sm font-medium mb-2 ${study?.target_audience ? 'text-gray-900' : 'text-gray-500'}`}>Target Audience</h3>
-                {isEditing ? (
-                  <textarea
-                    value={editedStudy?.target_audience || ''}
-                    onChange={(e) => setEditedStudy(prev => prev ? { ...prev, target_audience: e.target.value } : null)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    rows={3}
-                  />
-                ) : (
-                  study?.target_audience && (
-                    <p className="text-gray-900">{study.target_audience}</p>
-                  )
-                )}
-              </div>
-              <div>
-                <h3 className={`text-sm font-medium mb-2 ${study?.research_questions ? 'text-gray-900' : 'text-gray-500'}`}>Research Questions</h3>
-                {isEditing ? (
-                  <textarea
-                    value={editedStudy?.research_questions || ''}
-                    onChange={(e) => setEditedStudy(prev => prev ? { ...prev, research_questions: e.target.value } : null)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    rows={5}
-                  />
-                ) : (
-                  study?.research_questions && (
-                    <p className="text-gray-900">{study.research_questions}</p>
-                  )
-                )}
-              </div>
+                    Edit Details
+                  </button>
+                </>
+              )}
             </div>
           </div>
+          <div className="space-y-6">
+            <div>
+              <h3 className={`text-sm font-medium mb-2 ${study?.description ? 'text-gray-900' : 'bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 bg-clip-text text-transparent'}`}>Description</h3>
+              {isEditing ? (
+                <textarea
+                  value={editedStudy?.description || ''}
+                  onChange={(e) => setEditedStudy(prev => prev ? { ...prev, description: e.target.value } : null)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  rows={3}
+                />
+              ) : (
+                study?.description && (
+                  <p className="text-gray-900 whitespace-pre-wrap">{study.description}</p>
+                )
+              )}
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-2 ${study?.study_type ? 'text-gray-900' : 'text-gray-500'}`}>Study Type</h3>
+              {isEditing ? (
+                <select
+                  value={editedStudy?.study_type || ''}
+                  onChange={(e) => setEditedStudy(prev => prev ? { ...prev, study_type: e.target.value as Study['study_type'] } : null)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="">Select a study type</option>
+                  <option value="exploratory">Exploratory</option>
+                  <option value="comparative">Comparative</option>
+                  <option value="attitudinal">Attitudinal</option>
+                  <option value="behavioral">Behavioral</option>
+                </select>
+              ) : (
+                study?.study_type && (
+                  <p className="text-gray-900 capitalize">{study.study_type}</p>
+                )
+              )}
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-2 ${study?.objective ? 'text-gray-900' : 'text-gray-500'}`}>Objective</h3>
+              {isEditing ? (
+                <textarea
+                  value={editedStudy?.objective || ''}
+                  onChange={(e) => setEditedStudy(prev => prev ? { ...prev, objective: e.target.value } : null)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  rows={3}
+                />
+              ) : (
+                study?.objective && (
+                  <p className="text-gray-900">{study.objective}</p>
+                )
+              )}
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-2 ${study?.target_audience ? 'text-gray-900' : 'text-gray-500'}`}>Target Audience</h3>
+              {isEditing ? (
+                <textarea
+                  value={editedStudy?.target_audience || ''}
+                  onChange={(e) => setEditedStudy(prev => prev ? { ...prev, target_audience: e.target.value } : null)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  rows={3}
+                />
+              ) : (
+                study?.target_audience && (
+                  <p className="text-gray-900">{study.target_audience}</p>
+                )
+              )}
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium mb-2 ${study?.research_questions ? 'text-gray-900' : 'text-gray-500'}`}>Research Questions</h3>
+              {isEditing ? (
+                <textarea
+                  value={editedStudy?.research_questions || ''}
+                  onChange={(e) => setEditedStudy(prev => prev ? { ...prev, research_questions: e.target.value } : null)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  rows={5}
+                />
+              ) : (
+                study?.research_questions && (
+                  <p className="text-gray-900">{study.research_questions}</p>
+                )
+              )}
+            </div>
+          </div>
+        </div>
         );
       case 'questions':
         return (
@@ -708,7 +733,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 <div className="flex items-center gap-8 mt-8">
                   {/* Download Interview Guide Card */}
                   <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
-                    style={{
+                    style={{ 
                       background: 'rgba(255, 255, 255, 0.7)',
                       backdropFilter: 'blur(10px)',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -736,7 +761,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
                   {/* Seena Notetaker Card */}
                   <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
-                    style={{
+                      style={{
                       background: 'rgba(255, 255, 255, 0.7)',
                       backdropFilter: 'blur(10px)',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -764,7 +789,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
 
                   {/* Seena Voice Interviewer Card */}
                   <div className="flex items-center gap-4 p-4 pr-8 w-[450px] hover:scale-105 cursor-pointer transition-all duration-300"
-                    style={{
+                      style={{
                       background: 'rgba(255, 255, 255, 0.7)',
                       backdropFilter: 'blur(10px)',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -781,13 +806,13 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                         height={168}
                         className="rounded-xl"
                       />
-                    </div>
+              </div>
                     <div className="flex flex-col gap-2">
                       <h3 className="text-md font-semibold">Seena Voice Interviewer</h3>
                       <p className="text-xs text-gray-600">
                         Hands-free interviews with automatic transcription and AI-powered insights. Perfect for remote interviews or when you want to focus on the conversation.
                       </p>
-                    </div>
+            </div>
                   </div>
                 </div>
               </>
@@ -827,9 +852,9 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                                 <Download className="h-4 w-4" />
                                 <span>Download Guide</span>
                               </a>
-                            </div>
-                          </div>
-                        </div>
+          </div>
+                </div>
+              </div>
                       </div>
                     </div>
 
@@ -913,8 +938,18 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
       case 'interviews':
         return (
           <div className="bg-white rounded-lg border border-gray-300 p-6">
-            <h2 className="text-xl font-semibold mb-4">Interviews</h2>
-            <p className="text-gray-500">Coming soon...</p>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Interviews</h2>
+            </div>
+            <InterviewsList
+              studyId={id}
+              interviews={interviews}
+              onInterviewClick={handleInterviewClick}
+              onDeleteInterview={handleDeleteInterview}
+              onLaunchNotetaker={handleLaunchNotetaker}
+              onLaunchAIInterviewer={handleLaunchAIInterviewer}
+              onManualAdd={handleManualAdd}
+            />
           </div>
         );
       case 'insights':
@@ -1030,20 +1065,20 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                   </button>
                 </>
               )}
-            </div>
+                          </div>
           </div>
           {/* this is the status and the created date */}
           <div className="flex items-center gap-4 mt-4">
-            <Tag
-              variant={
+                          <Tag
+                            variant={
                 study?.status === 'active' ? 'green' :
                 study?.status === 'completed' ? 'blue' :
                 'grey'
-              }
-              size="sm"
-            >
+                            }
+                            size="sm"
+                          >
               {study?.status.charAt(0).toUpperCase() + study?.status.slice(1)}
-            </Tag>
+                          </Tag>
             <span className="text-sm text-gray-500">
               Created {new Date(study?.created_at || '').toLocaleDateString()}
             </span>
@@ -1077,8 +1112,8 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 </button>
               </div>
             </div>
-          )}
-        </div>
+            )}
+          </div>
       </div>
 
       {/* Main content */}
@@ -1177,7 +1212,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         }}
       />
 
-      <SetupInterviewDialog
+      <SetupInterviewDialog 
         isOpen={showSetupDialog}
         onClose={() => setShowSetupDialog(false)}
         onStart={handleStartInterview}

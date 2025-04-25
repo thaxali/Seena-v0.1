@@ -10,6 +10,8 @@ export interface Interview {
   source: string;
   created_at: string;
   updated_at: string;
+  participant_id?: string;
+  participant_code?: string;
 }
 
 export async function generateTitleFromTranscript(transcript: string): Promise<string> {
@@ -101,28 +103,52 @@ export async function getInterviewsForStudy(studyId: string): Promise<Interview[
   try {
     const { data, error } = await supabase
       .from('interviews')
-      .select('*')
+      .select(`
+        *,
+        participants (
+          code
+        )
+      `)
       .eq('study_id', studyId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+
+    // Transform the data to include participant_code
+    const interviews = (data || []).map(interview => ({
+      ...interview,
+      participant_code: interview.participants?.code
+    }));
+
+    return interviews;
   } catch (error) {
     console.error('Error fetching interviews:', error);
     throw error;
   }
 }
 
-export async function getInterviewById(interviewId: string): Promise<Interview | null> {
+export async function getInterviewById(interviewId: string): Promise<Interview> {
   try {
     const { data, error } = await supabase
       .from('interviews')
-      .select('*')
+      .select(`
+        *,
+        participants (
+          code
+        )
+      `)
       .eq('id', interviewId)
+      .is('deleted_at', null)
       .single();
 
     if (error) throw error;
-    return data;
+    if (!data) throw new Error('Interview not found');
+
+    return {
+      ...data,
+      participant_code: data.participants?.code
+    };
   } catch (error) {
     console.error('Error fetching interview:', error);
     throw error;
@@ -142,6 +168,20 @@ export async function updateInterview(interviewId: string, transcript: string): 
     return data;
   } catch (error) {
     console.error('Error updating interview:', error);
+    throw error;
+  }
+}
+
+export async function deleteInterview(interviewId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('interviews')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', interviewId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error soft deleting interview:', error);
     throw error;
   }
 } 

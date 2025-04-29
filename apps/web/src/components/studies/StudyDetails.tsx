@@ -26,7 +26,7 @@ interface StudyDetailsProps {
   id: string;
 }
 
-type TabType = 'setup' | 'questions' | 'notetaker' | 'interviews' | 'insights';
+type TabType = 'setup' | 'questions' | 'notetaker' | 'interviews' | 'insights' | 'guides';
 
 export default function StudyDetails({ id }: StudyDetailsProps) {
   const router = useRouter();
@@ -521,7 +521,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
   };
 
   const handleLaunchAIInterviewer = () => {
-    setSetupInterviewOpen(true);
+    router.push(`/studies/${id}/launch-interviewer`);
   };
 
   const handleManualAdd = () => {
@@ -937,19 +937,27 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         );
       case 'interviews':
         return (
-          <div className="bg-white rounded-lg border border-gray-300 p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Interviews</h2>
-            </div>
+          <div className="space-y-4">
             <InterviewsList
               studyId={id}
               interviews={interviews}
-              onInterviewClick={handleInterviewClick}
               onDeleteInterview={handleDeleteInterview}
               onLaunchNotetaker={handleLaunchNotetaker}
               onLaunchAIInterviewer={handleLaunchAIInterviewer}
               onManualAdd={handleManualAdd}
             />
+          </div>
+        );
+      case 'guides':
+        return (
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push(`/studies/${id}/interview-guides`)}
+            >
+              Manage Interview Guides
+            </Button>
           </div>
         );
       case 'insights':
@@ -1169,6 +1177,16 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
                 }`}
               >
                 Interviews
+              </button>
+              <button
+                onClick={() => handleTabClick('guides')}
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                  activeTab === 'guides'
+                     ? 'bg-white/80 text-black'
+                    : 'text-white hover:bg-white/80 hover:text-[#ff5021]'
+                }`}
+              >
+                Guides
               </button>
               <button
                 onClick={() => handleTabClick('insights')}

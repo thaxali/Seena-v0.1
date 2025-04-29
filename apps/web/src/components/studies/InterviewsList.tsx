@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Interview } from '@/lib/services/interview';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -9,13 +10,11 @@ import { Label } from '@/components/ui/Label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tag } from '@/components/ui/tag';
 import { MoreVertical, Trash2, BarChart2, Plus, ClipboardList, Bot, FileText } from 'lucide-react';
-import InterviewDetailsDialog from './InterviewDetailsDialog';
 import SimpleDialog from "@/components/ui/SimpleDialog";
 
 interface InterviewsListProps {
   studyId: string;
   interviews: Interview[];
-  onInterviewClick: (interview: Interview) => void;
   onDeleteInterview: (interview: Interview) => Promise<void>;
   onLaunchNotetaker?: () => void;
   onLaunchAIInterviewer?: () => void;
@@ -25,16 +24,14 @@ interface InterviewsListProps {
 export default function InterviewsList({
   studyId,
   interviews,
-  onInterviewClick,
   onDeleteInterview,
   onLaunchNotetaker,
   onLaunchAIInterviewer,
   onManualAdd
 }: InterviewsListProps) {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const [showNewInterviewDropdown, setShowNewInterviewDropdown] = useState(false);
@@ -153,7 +150,11 @@ export default function InterviewsList({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInterviews.map((interview) => (
-                <tr key={interview.id} className="hover:bg-gray-50">
+                <tr 
+                  key={interview.id} 
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/studies/${studyId}/interviews/${interview.id}`)}
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {interview.participant_code || 'N/A'}
                   </td>
@@ -180,7 +181,10 @@ export default function InterviewsList({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setShowDropdown(showDropdown === interview.id ? null : interview.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDropdown(showDropdown === interview.id ? null : interview.id);
+                        }}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
@@ -195,7 +199,10 @@ export default function InterviewsList({
                               Analyze <span className="text-xs text-gray-500"> (coming soon...)</span> 
                             </button>
                             <button
-                              onClick={() => handleDelete(interview)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(interview);
+                              }}
                               className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                               disabled={isDeleting}
                             >
@@ -213,19 +220,6 @@ export default function InterviewsList({
           </table>
         </ScrollArea>
       </div>
-
-      {/* Interview Details Dialog */}
-      <InterviewDetailsDialog
-        isOpen={isDetailsOpen}
-        onClose={() => setIsDetailsOpen(false)}
-        interview={selectedInterview}
-        onStartInterview={() => {
-          if (selectedInterview) {
-            onInterviewClick(selectedInterview);
-            setIsDetailsOpen(false);
-          }
-        }}
-      />
 
       <SimpleDialog
         isOpen={!!interviewToDelete}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import SimpleDialog from '@/components/ui/SimpleDialog';
 import { Button } from '@/components/ui/button';
 import { Interview } from '@/lib/services/interview';
@@ -9,16 +9,24 @@ interface InterviewDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   interview: Interview | null;
-  onStartInterview: () => void;
+  studyId: string;
+  onStartInterview?: () => void;
 }
 
 export default function InterviewDetailsDialog({
   isOpen,
   onClose,
   interview,
+  studyId,
   onStartInterview
 }: InterviewDetailsDialogProps) {
+  const router = useRouter();
+
   if (!interview) return null;
+
+  const handleViewDetails = () => {
+    router.push(`/studies/${studyId}/interviews/${interview.id}`);
+  };
 
   return (
     <SimpleDialog
@@ -43,9 +51,15 @@ export default function InterviewDetailsDialog({
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button onClick={onStartInterview}>
-            Start Interview
-          </Button>
+          {onStartInterview ? (
+            <Button onClick={onStartInterview}>
+              Start Interview
+            </Button>
+          ) : (
+            <Button onClick={handleViewDetails}>
+              View Details
+            </Button>
+          )}
         </div>
       </div>
     </SimpleDialog>

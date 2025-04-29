@@ -1205,11 +1205,7 @@ export default function StudyDetails({ id }: StudyDetailsProps) {
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         interview={selectedInterview}
-        onStartInterview={() => {
-          if (selectedInterview) {
-            router.push(`/studies/${study.id}/interviews/${selectedInterview.id}`);
-          }
-        }}
+        studyId={id}
       />
 
       <SetupInterviewDialog 

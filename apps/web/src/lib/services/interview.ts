@@ -12,6 +12,7 @@ export interface Interview {
   updated_at: string;
   participant_id?: string;
   participant_code?: string;
+  notes?: Record<string, string>;
 }
 
 export async function generateTitleFromTranscript(transcript: string): Promise<string> {

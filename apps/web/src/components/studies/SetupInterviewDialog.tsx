@@ -1,20 +1,61 @@
 'use client';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useState } from 'react';
+import SimpleDialog from '@/components/ui/SimpleDialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/Label';
 
 interface SetupInterviewDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onStart: (participantName: string) => void;
 }
 
-export default function SetupInterviewDialog({ open, onOpenChange }: SetupInterviewDialogProps) {
+export default function SetupInterviewDialog({
+  isOpen,
+  onClose,
+  onStart
+}: SetupInterviewDialogProps) {
+  const [participantName, setParticipantName] = useState('');
+
+  const handleStart = () => {
+    if (participantName.trim()) {
+      onStart(participantName);
+      setParticipantName('');
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-white/80 backdrop-blur-md border border-gray-200/50 shadow-lg">
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-900">Set up interview protocol</h2>
+    <SimpleDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Setup Interview"
+      description="Enter the participant's name to start the interview"
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="participantName">Participant Name</Label>
+          <Input
+            id="participantName"
+            value={participantName}
+            onChange={(e) => setParticipantName(e.target.value)}
+            placeholder="Enter participant name"
+            className="mt-1"
+          />
         </div>
-      </DialogContent>
-    </Dialog>
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleStart}
+            disabled={!participantName.trim()}
+          >
+            Start Interview
+          </Button>
+        </div>
+      </div>
+    </SimpleDialog>
   );
 } 

@@ -76,7 +76,7 @@ const Tag = React.forwardRef<HTMLSpanElement, TagProps>(
         className={cn(tagVariants({ variant, size, className }))}
         {...props}
       >
-        <span className="relative z-10">{children}</span>
+        <span className="relative z-10 text-xs font-mono tracking-tighter">{children}</span>
       </span>
     )
   }

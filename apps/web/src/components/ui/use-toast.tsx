@@ -9,5 +9,6 @@ type ToastProps = {
 export const toast = ({ title, description, variant = "default" }: ToastProps) => {
   sonnerToast[variant === "destructive" ? "error" : "success"](title, {
     description,
+    className: "bg-black text-white"
   });
 }; 

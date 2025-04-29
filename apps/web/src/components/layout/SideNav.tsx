@@ -12,8 +12,6 @@ import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', disabled: false, icon: LayoutDashboard },
-  { name: 'Studies', path: '/studies', disabled: false, icon: ClipboardList },
-  { name: 'Interviewer', path: '/interviewer', disabled: false, icon: Users },
   { name: 'Insights', path: '/insights', disabled: true, comingSoon: true, icon: BarChart2 },
 ];
 

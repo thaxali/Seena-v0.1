@@ -1,0 +1,36 @@
+.participant-reveal {
+  position: relative;
+  display: inline-block;
+  color: #111827; /* text-gray-900 */
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 600; /* font-semibold */
+  transition: all 1.5s ease;
+}
+
+.participant-reveal::after {
+  content: attr(data-name);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  filter: blur(8px);
+  transition: opacity 1.5s ease, filter 1.5s ease, color 1.5s ease;
+  pointer-events: none;
+  color: #f97316; /* orange-500 */
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+.participant-reveal:hover::after {
+  opacity: 1;
+  filter: blur(0px);
+  color: #111827; /* text-gray-900 */
+}
+
+.participant-reveal:hover {
+  color: transparent;
+} 
